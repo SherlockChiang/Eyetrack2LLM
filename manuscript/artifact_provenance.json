@@ -402,6 +402,12 @@
     "path": "manuscript/artifact_manifest.csv",
     "sha256": "23e018f35b87db3bccb4a7668072506418bc2aba124d1365cfef2ad2335b32a5"
   },
+  "archive": {
+    "version": "v0.1.2",
+    "commit": "9736efab203d263186b605074bb4a97cef8333f7",
+    "version_doi": "10.5281/zenodo.21322672",
+    "concept_doi": "10.5281/zenodo.21322671"
+  },
   "acquisition_documentation": [
     "docs/data.md",
     "docs/zuco.md"

@@ -4,9 +4,16 @@ title: "Eyetrack2LLM"
 version: 0.1.2
 date-released: 2026-07-12
 license: MIT
+doi: "10.5281/zenodo.21322672"
 repository-code: "https://github.com/SherlockChiang/Eyetrack2LLM"
 url: "https://github.com/SherlockChiang/Eyetrack2LLM"
 identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21322672"
+    description: "Version-specific archive for v0.1.2"
+  - type: doi
+    value: "10.5281/zenodo.21322671"
+    description: "Concept DOI for all versions"
   - type: url
     value: "https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.1.2"
     description: "Software and reproducibility artifact release"

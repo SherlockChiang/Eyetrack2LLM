@@ -1,5 +1,7 @@
 # Eyetrack2LLM
 
+[![DOI](https://zenodo.org/badge/1298221502.svg)](https://doi.org/10.5281/zenodo.21322671)
+
 Eyetrack2LLM tests when cross-fitted gaze-transition residual relations are reproducible, learnable, useful, and transportable as cognitive supervision for language models.
 
 The estimand is destination allocation conditional on the next retained transition being forward, within sentence, and within line. It is not an unconditional next-fixation model or semantic distance. Simulation and corpus results show why reliability is necessary but insufficient evidence for cognitive supervision; see the [paper](manuscript/manuscript.md) and [limitations](docs/limitations.md) for the bounded claims.
@@ -34,6 +36,7 @@ Raw and processed participant-level corpora, model checkpoints, caches, and gene
 ## Artifacts
 
 - [Latest release](https://github.com/SherlockChiang/Eyetrack2LLM/releases/latest) contains the compact processed-results archive used for archive-level hash verification.
+- [Zenodo v0.1.2](https://doi.org/10.5281/zenodo.21322672) is the immutable archive used by the paper; the badge above resolves to the all-versions concept DOI.
 - [`arxiv/`](arxiv/) is the complete, self-contained paper source.
 - [`manuscript/`](manuscript/) contains frozen PNG figures, source data, tables, and SHA-256 provenance.
 
