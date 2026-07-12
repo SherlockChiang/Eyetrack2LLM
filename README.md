@@ -1,45 +1,40 @@
 # Eyetrack2LLM
 
-[![DOI](https://zenodo.org/badge/1298221502.svg)](https://doi.org/10.5281/zenodo.21322671)
+Eyetrack2LLM tests whether cross-fitted gaze-transition residual relations are reproducible, learnable, and transportable as cognitive supervision for language models. The estimand is destination allocation conditional on the next retained transition being forward, within sentence, and within line. It is not an unconditional next-fixation model, semantic distance, or causal effect.
 
-Eyetrack2LLM tests when cross-fitted gaze-transition residual relations are reproducible, learnable, useful, and transportable as cognitive supervision for language models.
-
-The estimand is destination allocation conditional on the next retained transition being forward, within sentence, and within line. It is not an unconditional next-fixation model or semantic distance. Simulation and corpus results show why reliability is necessary but insufficient evidence for cognitive supervision; see the [paper](manuscript/manuscript.md) and [limitations](docs/limitations.md) for the bounded claims.
-
-## Install And Verify
+## Install
 
 Python 3.10 or newer is supported.
 
 ```bash
-python -m pip install -e ".[test]"
+python -m pip install ".[test]"
 python -m pytest
-python scripts/verify_results.py
-python scripts/check_release.py --public
 ```
 
-These commands require no corpus download, model download, checkpoint, or generated `data/processed` directory. The default verifier checks frozen source data, tables, provenance, and the self-contained arXiv source. Full local result verification is available after obtaining the restricted inputs:
+The test suite is self-contained and downloads no data, models, or checkpoints.
+
+## Data
+
+Provo and ZuCo participant data are not distributed here. Obtain them from their official sources and follow their licenses; see [data access](docs/data.md) and the [ZuCo conversion notes](docs/zuco.md). Local raw and processed files belong under `data/raw/` and `data/processed/`.
+
+## Minimal Reproduction
+
+Run commands from the repository root. The complete argument sets and expected local paths are in [reproducibility.md](docs/reproducibility.md).
 
 ```bash
-python scripts/verify_results.py --full-local-results
+python scripts/convert_provo.py --help
+python scripts/run_residual_recovery_simulation.py --help
+python scripts/analyze_provo_independent_reliability.py --help
+python scripts/analyze_provo_specification_curve.py --help
+python scripts/run_auxiliary_experiment.py --help
+python scripts/analyze_provo_text_inference.py --help
+python scripts/convert_zuco.py --help
+python scripts/run_zuco_transfer.py --help
+python scripts/audit_zuco_criterion_uncertainty.py --help
 ```
 
-## Reproduction
-
-- [Methods](docs/methods.md)
-- [Data acquisition and licensing](docs/data.md)
-- [Environment](docs/environment.md)
-- [Complete commands](docs/reproducibility.md)
-- [ZuCo conversion](docs/zuco.md)
-
-Raw and processed participant-level corpora, model checkpoints, caches, and generated bundles are not distributed in Git. High-cost manuscript regeneration is documented but is not run in CI.
-
-## Artifacts
-
-- [Latest release](https://github.com/SherlockChiang/Eyetrack2LLM/releases/latest) contains the compact processed-results archive used for archive-level hash verification.
-- [Zenodo v0.1.2](https://doi.org/10.5281/zenodo.21322672) is the immutable archive used by the paper; the badge above resolves to the all-versions concept DOI.
-- [`arxiv/`](arxiv/) is the complete, self-contained paper source.
-- [`manuscript/`](manuscript/) contains frozen PNG figures, source data, tables, and SHA-256 provenance.
+Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). The immutable [Zenodo v0.1.2 archive](https://doi.org/10.5281/zenodo.21322672) preserves the historical release.
 
 ## Citation And License
 
-Use [`CITATION.cff`](CITATION.cff) to cite the software and accompanying paper. Repository-authored code and documentation are MIT licensed; third-party datasets retain their own terms.
+Use [CITATION.cff](CITATION.cff) to cite the software. Repository-authored code and documentation are MIT licensed; third-party datasets retain their own terms.

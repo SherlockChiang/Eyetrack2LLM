@@ -1,9 +1,0 @@
-# Figure Captions
-
-**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.
-
-**Figure 2. The simulation reliability paradox.** Mean latent recovery and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under a null latent effect, omitted nuisance structure can yield high reliability without latent recovery.
-
-**Figure 3. Specification curve and permutation control.** Event-weighted held-out predictive NLL and text-median edge-pattern reliability for four predefined baseline models. Boxes summarize 100 randomized partitions of the fixed 84-reader sample; gray violins and ranges summarize 500 shared permutation-null replicates per specification. NLL and reliability use different weighting estimands. Add-one inference has minimum resolution 1/501; Table 3 reports raw and familywise max-statistic p values.
-
-**Figure 4. Functional and transfer evidence.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five optimization seeds on one fixed 10-text split. Seeds are optimization perturbations, not independent replicates; the horizontal line is the fixed-split text-equal macro correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader percentile text-bootstrap 95% interval and squares show the nested reader-and-text percentile interval; positive values favor gaze. The final panel summarizes cross-corpus measurement non-equivalence.
