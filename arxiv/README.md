@@ -13,13 +13,9 @@ pdflatex -interaction=nonstopmode -halt-on-error main.tex
 
 On PowerShell the same commands work. `make` runs the same two passes when GNU Make and `pdflatex` are available. A portable Tectonic build can use `tectonic --keep-logs --outdir ../dist main.tex`; Tectonic may download its official TeX bundle cache outside this source directory.
 
-## Placeholders
+## Remaining metadata
 
-- Author names, order, affiliations, and CRediT roles.
-- Permanent archive DOI and exact archived version.
-- Institution-appropriate ethics or exemption wording.
-- Conflict-of-interest statement.
-- Funding sources, grant numbers, and funder roles, or a no-specific-funding statement.
+- The permanent Zenodo archive DOI will be inserted after the versioned release is deposited.
 
 ## Source list
 
@@ -32,9 +28,6 @@ On PowerShell the same commands work. `make` runs the same two passes when GNU M
 
 Generate the submission ZIP from the repository root with `python scripts/build_arxiv_bundle.py`. The generated archive has `main.tex` at its top level.
 
-## Submission blockers
+## Submission blocker
 
-- Author names, order, affiliations, and final CRediT roles require author confirmation.
-- The permanent archive DOI and exact archived version remain to be inserted.
-- Institution-appropriate ethics or exemption wording remains to be confirmed.
-- Conflict-of-interest and funding statements require author-supplied final wording.
+- The permanent Zenodo archive DOI remains to be inserted.

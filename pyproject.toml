@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eyetrack2llm"
-version = "0.1.1"
+version = "0.1.2"
 description = "Reliability, learnability, and transport audits for gaze-transition residual supervision"
 readme = "README.md"
 license = {file = "LICENSE"}

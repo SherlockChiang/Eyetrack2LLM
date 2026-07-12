@@ -1,7 +1,11 @@
 # The Reliability Paradox in Forward Target Selection: Measurement-Conditioned Cognitive Supervision in Natural Reading
 
-**Yuhan Jiang**
+**Yuhan Jiang***
 Hong Kong Baptist University, Hong Kong SAR, China
+
+ORCID: https://orcid.org/0009-0002-2056-9328
+
+*Corresponding author: sherlockchiang@gmail.com*
 
 ## Abstract
 
