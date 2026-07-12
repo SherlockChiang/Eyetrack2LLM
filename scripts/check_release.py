@@ -48,8 +48,12 @@ def public_files(root: Path) -> list[Path]:
 
 
 def candidate_files(root: Path, mode: str = "public") -> list[Path]:
-    if mode == "public":
+    if mode in {"public", "staged"}:
         return public_files(root)
+    raise ValueError(f"unknown release audit mode: {mode}")
+
+
+def staged_files(root: Path) -> list[Path]:
     result = subprocess.run(["git", "diff", "--cached", "--name-only", "-z"], cwd=root, capture_output=True, check=True)
     return [root / name.decode() for name in result.stdout.split(b"\0") if name]
 
@@ -112,7 +116,11 @@ def audit_release(root: Path, mode: str = "public") -> list[Finding]:
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         return [Finding("ERROR", "PUBLIC_FILES.txt", str(error))]
     if mode == "staged":
-        for path in files:
+        try:
+            staged = staged_files(root)
+        except subprocess.CalledProcessError as error:
+            return [Finding("ERROR", "git index", str(error))]
+        for path in staged:
             if path.resolve() not in public:
                 findings.append(Finding("ERROR", path.relative_to(root).as_posix(), "staged file is not public"))
     names = {path.relative_to(root).as_posix() for path in files}

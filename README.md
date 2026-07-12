@@ -33,7 +33,7 @@ Raw and processed participant-level corpora, model checkpoints, caches, and gene
 
 ## Artifacts
 
-- [Release v0.1.0](https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.1.0) contains the compact processed-results archive used for archive-level hash verification.
+- [Latest release](https://github.com/SherlockChiang/Eyetrack2LLM/releases/latest) contains the compact processed-results archive used for archive-level hash verification.
 - [`arxiv/`](arxiv/) is the complete, self-contained paper source.
 - [`manuscript/`](manuscript/) contains frozen PNG figures, source data, tables, and SHA-256 provenance.
 

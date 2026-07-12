@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eyetrack2llm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Reliability, learnability, and transport audits for gaze-transition residual supervision"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -22,7 +22,7 @@ classifiers = [
 
 [project.optional-dependencies]
 torch = ["torch>=2.1"]
-test = ["pytest>=8", "torch>=2.1"]
+test = ["pytest>=8", "torch>=2.1", "wordfreq==3.1.1"]
 analysis = ["wordfreq==3.1.1", "spacy==3.8.14", "thinc>=8.3.12,<8.4", "confection>=1.3.2,<2", "transformers>=5.13,<5.14", "torch>=2.13"]
 figures = ["matplotlib>=3.8,<3.11"]
 
