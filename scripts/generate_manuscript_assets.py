@@ -116,7 +116,7 @@ def extract_assets(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
     fields = list(dict.fromkeys(key for row in rows for key in row))
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -128,7 +128,7 @@ def _write_table(base: Path, title: str, rows: list[dict[str, Any]]) -> list[Pat
     fields = list(rows[0])
     lines = [f"# {title}", "", "| " + " | ".join(fields) + " |", "| " + " | ".join("---" for _ in fields) + " |"]
     lines.extend("| " + " | ".join(str(row.get(field, "")) for field in fields) + " |" for row in rows)
-    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return [csv_path, md_path]
 
 
@@ -314,6 +314,7 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
     table_outputs = make_tables(data, extracted, tables)
     captions = manuscript / "figure_captions.md"
     captions.write_text("""# Figure Captions\n\n**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.\n\n**Figure 2. The simulation reliability paradox.** Mean latent recovery and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under a null latent effect, omitted nuisance structure can yield high reliability without latent recovery.\n\n**Figure 3. Specification curve and permutation control.** Event-weighted held-out predictive NLL and text-median edge-pattern reliability for four predefined baseline models. Boxes summarize 100 randomized partitions of the fixed 84-reader sample; gray violins and ranges summarize 500 shared permutation-null replicates per specification. NLL and reliability use different weighting estimands. Add-one inference has minimum resolution 1/501; Table 3 reports raw and familywise max-statistic p values.\n\n**Figure 4. Functional and transfer evidence.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five optimization seeds on one fixed 10-text split. Seeds are optimization perturbations, not independent replicates; the horizontal line is the fixed-split text-equal macro correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader percentile text-bootstrap 95% interval and squares show the nested reader-and-text percentile interval; positive values favor gaze. The final panel summarizes cross-corpus measurement non-equivalence.\n""", encoding="utf-8")
+    captions.write_text(captions.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     all_outputs = source_outputs + figure_outputs + table_outputs + [captions]
     script = root / "scripts" / "generate_manuscript_assets.py"
     generated_at = timestamp or os.environ.get("SOURCE_DATE_EPOCH")
@@ -347,7 +348,7 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
                   "manifest": {"path": manifest.relative_to(root).as_posix(), "sha256": sha256(manifest)},
                   "acquisition_documentation": ["docs/data.md", "docs/zuco.md"]}
     provenance_path = manuscript / "artifact_provenance.json"
-    provenance_path.write_text(json.dumps(provenance, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    provenance_path.write_text(json.dumps(provenance, indent=2, ensure_ascii=True) + "\n", encoding="utf-8", newline="\n")
     return provenance
 
 

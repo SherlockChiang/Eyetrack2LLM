@@ -1,5 +1,6 @@
 # Release metadata
 .gitignore
+.gitattributes
 .github/workflows/ci.yml
 README.md
 LICENSE
