@@ -1,0 +1,20 @@
+\begin{table}[tbp]
+\centering
+\caption{Selected residual and exposure diagnostics across 100 Provo partitions. Values are median edge-weighted reliabilities (Q1, Q3). Mass matching independently thinned subject-category counts toward far-category mass while preserving candidate cells.}
+\label{tab:s4-residual-diagnostics}
+\small
+\begin{tabularx}{\linewidth}{llY}
+\toprule
+Specification & Diagnostic & Median (Q1, Q3) \\
+\midrule
+Syntax & All edges: Pearson / deviance / raw deviation & .4653 (.4571, .4706) / .5508 (.5445, .5565) / .7231 (.7148, .7306) \\
+Flexible & All edges: Pearson / deviance / raw deviation & .4231 (.4147, .4310) / .5421 (.5351, .5468) / .7210 (.7130, .7287) \\
+Syntax & Pearson by expected count: $<.5$ / $.5$--1 / 1--5 / $\geq5$ & .0545 / .4060 / .5372 / .7370 \\
+Flexible & Pearson by expected count: $<.5$ / $.5$--1 / 1--5 / $\geq5$ & .0369 / .3987 / .5273 / .7360 \\
+Syntax & Mass-matched Pearson: adjacent / near / far & .9087 / .5691 / .4593 \\
+Syntax & Mass-matched deviance: adjacent / near / far & .8189 / .4458 / .6185 \\
+Flexible & Mass-matched Pearson: adjacent / near / far & .9093 / .5586 / .4087 \\
+Flexible & Mass-matched deviance: adjacent / near / far & .8061 / .4240 / .6067 \\
+\bottomrule
+\end{tabularx}
+\end{table}

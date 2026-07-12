@@ -1,0 +1,6 @@
+stage,evidence,evidence_status
+1,Construct definition,Computational relation; not semantic distance
+2,Estimator validation,subject-level Dirichlet-multinomial
+3,Measurement reliability,Two non-overlapping 42-reader halves per fixed-sample partition
+4,Functional test,Provo auxiliary training and ZuCo transfer
+5,External construct validation,Future human study; not completed

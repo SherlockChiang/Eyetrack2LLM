@@ -1,0 +1,21 @@
+\begin{table}[tbp]
+\centering
+\caption{Specification results across 100 randomized partitions of the fixed 84-reader sample. Raw add-one values use each specification's 500 shared null replicates; four-specification and 12-cell values use the shared-replicate maximum.}
+\label{tab:specifications}
+\small
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lrrrrrrrr}
+\toprule
+Specification & Rank & NLL $-$ uniform & Edge $r$ & Null med. & Raw $p$ & 4-spec $p$ & 12-cell $p$ & $B$ \\
+\midrule
+Position-only & 5 & -46,279.02 & .7651 & -.0064 & .0020 & .0020 & .0020 & 500 \\
+Lexical & 9 & -53,999.65 & .4717 & -.0068 & .0020 & .0020 & .0020 & 500 \\
+Syntax/common-core & 12 & -54,091.02 & .4653 & -.0068 & .0020 & .0020 & .0020 & 500 \\
+Flexible & 15 & -54,184.94 & .4231 & -.0069 & .0020 & .0020 & .0020 & 500 \\
+\bottomrule
+\end{tabular}
+}
+\begin{minipage}{0.95\linewidth}\small
+NLL is event/count-weighted; reliability is computed within text and summarized by the text median. Destination labels were permuted independently by half within source, while each replicate was shared across specifications and metrics. All displayed add-one values equal the minimum resolution, $1/501=.001996$; values are rounded to four decimals.
+\end{minipage}
+\end{table}

@@ -1,0 +1,42 @@
+# Local and derived data (keep the policy file itself)
+data/raw/
+data/processed/
+!data/.gitignore
+dist/
+*.pt
+*.npz
+*.mat
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# TeX and Tectonic build products. Source PDFs in arxiv/figures remain tracked.
+*.aux
+*.log
+*.out
+*.synctex
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.toc
+*.xdv
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

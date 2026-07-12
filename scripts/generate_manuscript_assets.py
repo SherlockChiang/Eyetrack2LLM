@@ -1,0 +1,365 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PROCESSED = ROOT / "data" / "processed"
+PRIMARY = {
+    "conversion": "provo_conversion_strictline_report.json",
+    "reliability": "provo_commoncore_strictline_independent_reliability.json",
+    "simulation": "residual_recovery_simulation.json",
+    "specification": "provo_strictline_specification_curve.json",
+    "transfer": "zuco_transfer_strictline_fixed50.json",
+    "invariance": "cross_corpus_measurement_invariance.json",
+    "influence": "text_influence_diagnostics.json",
+    "half_audit": "provo_half_specific_baseline_audit.json",
+    "target_decomposition": "provo_target_selection_decomposition.json",
+    "residual_diagnostics": "provo_residual_exposure_diagnostics.json",
+    "aux_text": "provo_auxiliary_strictline_fixed50_text_inference.json",
+    "aux_budget": "provo_auxiliary_strictline_budget_sensitivity.json",
+    "criterion": "zuco_strictline_criterion_uncertainty.json",
+    **{f"seed_{seed}": f"provo_auxiliary_strictline_fixed50_seed{seed}.json" for seed in (101, 202, 303, 404, 505)},
+}
+SUPERSEDED = {
+    "provo_commoncore_independent_reliability.json",
+    "zuco_transfer_commoncore_fixed50.json",
+    "zuco_zero_shot_transfer.json",
+    "zuco_zero_shot_transfer_fixed50_forwardrisk.json",
+    "fresh_probe_representation.json",
+    "zuco_transfer_sensitivity.json",
+}
+SPEC_ORDER = ("position_only", "lexical", "syntax", "flexible")
+METHOD_ORDER = ("correct", "misspecified", "raw")
+PALETTE = {"blue": "#0072B2", "orange": "#E69F00", "green": "#009E73", "red": "#D55E00", "purple": "#CC79A7", "gray": "#666666"}
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_primary(processed: Path = PROCESSED) -> tuple[dict[str, Any], dict[str, Path]]:
+    paths = {key: processed / name for key, name in PRIMARY.items()}
+    if any(path.name in SUPERSEDED for path in paths.values()):
+        raise ValueError("primary artifact allowlist contains a superseded input")
+    missing = [str(path) for path in paths.values() if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(f"missing primary artifacts: {', '.join(missing)}")
+    data = {key: json.loads(path.read_text(encoding="utf-8")) for key, path in paths.items()}
+    for key, value in data.items():
+        if key != "conversion" and value.get("status") != "complete":
+            raise ValueError(f"primary artifact is not complete: {paths[key].name}")
+    return data, paths
+
+
+def extract_assets(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    sim = data["simulation"]
+    simulation = [{k: row.get(k) for k in (
+        "subjects", "latent_effect", "concentration", "overdispersion", "method", "replicates",
+        "latent_recovery_correlation_mean", "latent_recovery_correlation_q025", "latent_recovery_correlation_q975",
+        "split_half_residual_reliability_mean", "split_half_residual_reliability_q025", "split_half_residual_reliability_q975",
+    )} for row in sim["summary"]]
+    specification = []
+    spec = data["specification"]
+    for name in SPEC_ORDER:
+        for row in spec["repeat_results"][name]:
+            specification.append({
+                "specification": name, "kind": "observed", "repeat": row["repeat"],
+                "nll_minus_uniform": sum(part["nll_minus_uniform"] for part in row["predictive"]),
+                "edge_weighted_reliability": row["reliability"]["edge_weighted"],
+            })
+        for index, row in enumerate(spec["null_results"][name]):
+            specification.append({
+                "specification": name, "kind": "permutation_null", "repeat": row.get("permutation_replicate", index),
+                "nll_minus_uniform": "", "edge_weighted_reliability": row["reliability"]["edge_weighted"],
+            })
+    functional = []
+    for seed in (101, 202, 303, 404, 505):
+        run = data[f"seed_{seed}"]
+        for condition in ("mlm", "gaze"):
+            test = run["conditions"][condition]["test"]
+            functional.append({"panel": "provo", "seed": seed, "condition": condition,
+                               "mlm_nll": test["mlm_nll"], "residual_correlation": test["gaze_correlation"]})
+    for contrast in ("gaze_vs_mlm", "gaze_vs_shuffled", "gaze_vs_position"):
+        result = data["transfer"]["comparisons"][contrast]["text_equal_fisher_z"]
+        fixed = result["bootstrap_95_ci"]
+        nested = data["criterion"]["reader_bootstrap"]["summary"][contrast]["joint_reader_and_text"]
+        functional.append({"panel": "zuco", "contrast": contrast, "mean": result["mean_difference"],
+                           "fixed_ci_low": fixed[0], "fixed_ci_high": fixed[1],
+                           "nested_ci_low": nested["95_ci"][0], "nested_ci_high": nested["95_ci"][1],
+                           "uncertainty": "fixed-12 text bootstrap and reader-and-text nested bootstrap",
+                           "texts": result["texts_valid"]})
+    gaze_text = data["aux_text"]["conditions"]["gaze"]
+    functional.append({"panel": "provo_summary", "condition": "gaze", "macro_text_correlation": gaze_text["macro_text_equal_correlation_seed_averaged_fisher_z"],
+                       "pooled_edge_correlation": gaze_text["pooled_edge_correlation"], "texts": len(data["aux_text"]["test_texts"])})
+    ladder = [
+        {"stage": 1, "evidence": "Construct definition", "evidence_status": "Computational relation; not semantic distance"},
+        {"stage": 2, "evidence": "Estimator validation", "evidence_status": sim["data_generating_process"]["counts"]},
+        {"stage": 3, "evidence": "Measurement reliability", "evidence_status": "Two non-overlapping 42-reader halves per fixed-sample partition"},
+        {"stage": 4, "evidence": "Functional test", "evidence_status": "Provo auxiliary training and ZuCo transfer"},
+        {"stage": 5, "evidence": "External construct validation", "evidence_status": "Future human study; not completed"},
+    ]
+    return {"figure1": ladder, "figure2": simulation, "figure3": specification, "figure4": functional}
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fields = list(dict.fromkeys(key for row in rows for key in row))
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _write_table(base: Path, title: str, rows: list[dict[str, Any]]) -> list[Path]:
+    csv_path = base.with_suffix(".csv")
+    md_path = base.with_suffix(".md")
+    _write_csv(csv_path, rows)
+    fields = list(rows[0])
+    lines = [f"# {title}", "", "| " + " | ".join(fields) + " |", "| " + " | ".join("---" for _ in fields) + " |"]
+    lines.extend("| " + " | ".join(str(row.get(field, "")) for field in fields) + " |" for row in rows)
+    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return [csv_path, md_path]
+
+
+def _style(plt: Any) -> None:
+    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8,
+                         "xtick.labelsize": 7, "ytick.labelsize": 7, "axes.spines.top": False,
+                         "axes.spines.right": False, "svg.fonttype": "none", "pdf.fonttype": 42})
+
+
+def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> list[Path]:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    _style(plt)
+    made: list[Path] = []
+
+    fig, ax = plt.subplots(figsize=(7.2, 2.8), constrained_layout=True)
+    rows = extracted["figure1"]
+    x = np.arange(len(rows))
+    colors = [PALETTE["blue"]] * 4 + ["white"]
+    ax.scatter(x, [0] * len(x), s=900, c=colors, edgecolors=PALETTE["gray"], linewidths=1.2, zorder=3)
+    ax.plot(x, [0] * len(x), color="#BBBBBB", lw=2, zorder=1)
+    for i, row in enumerate(rows):
+        ax.text(i, 0, str(row["stage"]), ha="center", va="center", color="white" if i < 4 else "black", weight="bold")
+        ax.text(i, .42, row["evidence"], ha="center", va="bottom", weight="bold", fontsize=7.5)
+        ax.text(i, -.42, row["evidence_status"], ha="center", va="top", fontsize=6.8, wrap=True)
+    ax.text(4, .08, "NOT RUN", ha="center", va="center", fontsize=6, weight="bold")
+    ax.set(xlim=(-.55, 4.55), ylim=(-1.05, .95), title="Evidence ladder for a computational measurement claim")
+    ax.axis("off")
+    made += _save(fig, output / "figure1_evidence_ladder")
+
+    fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.4), sharex=True, sharey="row", constrained_layout=True)
+    simrows = extracted["figure2"]
+    for col, effect in enumerate((0.0, 0.55)):
+        for method, color, marker in zip(METHOD_ORDER, (PALETTE["blue"], PALETTE["red"], PALETTE["gray"]), ("o", "s", "^")):
+            for over, ls in (("low", "-"), ("high", "--")):
+                subset = sorted((r for r in simrows if r["latent_effect"] == effect and r["method"] == method and r["overdispersion"] == over), key=lambda r: r["subjects"])
+                xs = [r["subjects"] for r in subset]
+                for rowi, prefix in ((0, "latent_recovery_correlation"), (1, "split_half_residual_reliability")):
+                    ys = np.array([r[prefix + "_mean"] for r in subset])
+                    lo = np.array([r[prefix + "_q025"] for r in subset]); hi = np.array([r[prefix + "_q975"] for r in subset])
+                    axes[rowi, col].errorbar(xs, ys, yerr=[ys-lo, hi-ys], color=color, marker=marker, ls=ls, lw=1, ms=4, capsize=2,
+                                              label=f"{method}; {over} OD" if rowi == 0 and col == 0 else None)
+        axes[0, col].set_title("Null latent effect" if effect == 0 else "Latent effect = 0.55")
+        axes[1, col].set_xlabel("Subjects")
+    axes[0, 0].set_ylabel("Latent recovery, r")
+    axes[1, 0].set_ylabel("Split reliability, r")
+    for ax in axes.flat: ax.axhline(0, color="#BBBBBB", lw=.7); ax.grid(axis="y", color="#EEEEEE")
+    axes[0, 0].legend(frameon=False, fontsize=6, ncol=2)
+    axes[1, 0].annotate("High reliability under the null\nwhen nuisance fit is misspecified", xy=(84, next(r["split_half_residual_reliability_mean"] for r in simrows if r["latent_effect"] == 0 and r["subjects"] == 84 and r["method"] == "misspecified" and r["overdispersion"] == "low")), xytext=(8, .45), arrowprops={"arrowstyle": "->", "color": PALETTE["red"]}, color=PALETTE["red"], fontsize=7)
+    made += _save(fig, output / "figure2_reliability_paradox")
+
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.3), constrained_layout=True)
+    specs = extracted["figure3"]
+    obs_nll = [[r["nll_minus_uniform"] for r in specs if r["specification"] == name and r["kind"] == "observed"] for name in SPEC_ORDER]
+    axes[0].boxplot(obs_nll, tick_labels=[s.replace("_", "\n") for s in SPEC_ORDER], showfliers=False, widths=.6)
+    axes[0].set_ylabel("Held-out NLL minus uniform"); axes[0].set_title("Predictive fit (lower is better)")
+    positions = np.arange(1, 5)
+    for i, name in enumerate(SPEC_ORDER):
+        observed = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "observed"]
+        null = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "permutation_null"]
+        violin = axes[1].violinplot([null], positions=[positions[i]-.14], widths=.22,
+                                    showmeans=False, showmedians=True, showextrema=True)
+        for body in violin["bodies"]:
+            body.set_facecolor(PALETTE["gray"]); body.set_alpha(.45)
+        for key in ("cmedians", "cmins", "cmaxes", "cbars"):
+            violin[key].set_color(PALETTE["gray"]); violin[key].set_linewidth(.8)
+        axes[1].boxplot([observed], positions=[positions[i]+.14], widths=.22, showfliers=False, patch_artist=True, boxprops={"facecolor": PALETTE["blue"], "alpha": .65})
+    axes[1].set_xticks(positions, [s.replace("_", "\n") for s in SPEC_ORDER]); axes[1].set_ylabel("Edge-weighted reliability, r")
+    axes[1].set_title("Observed (blue) vs permutation null (gray)")
+    axes[1].text(.02, .98, "500 shared null replicates: minimum add-one p = 1/501", transform=axes[1].transAxes, va="top", fontsize=7)
+    made += _save(fig, output / "figure3_specification_curve")
+
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.9), constrained_layout=True)
+    functional = extracted["figure4"]
+    provo = [r for r in functional if r["panel"] == "provo"]
+    by_seed = {r["seed"]: r for r in provo if r["condition"] == "mlm"}
+    gaze = [r for r in provo if r["condition"] == "gaze"]
+    for r in gaze:
+        axes[0].scatter(r["mlm_nll"] - by_seed[r["seed"]]["mlm_nll"], r["residual_correlation"], color=PALETTE["blue"], s=28)
+        axes[0].annotate(str(r["seed"]), (r["mlm_nll"] - by_seed[r["seed"]]["mlm_nll"], r["residual_correlation"]), fontsize=6, xytext=(3, 2), textcoords="offset points")
+    macro = next(r for r in functional if r["panel"] == "provo_summary")
+    axes[0].axhline(macro["macro_text_correlation"], color=PALETTE["green"], lw=1.2, label="text-equal macro")
+    axes[0].axvline(0, color="#999999", lw=.8); axes[0].set(xlabel="Gaze - MLM NLL", ylabel="Residual correlation", title="Provo: fixed 10-text split")
+    axes[0].legend(frameon=False, fontsize=6)
+    zuco = [r for r in functional if r["panel"] == "zuco"]
+    y = np.arange(3)
+    means = np.array([r["mean"] for r in zuco])
+    fixed_lo=np.array([r["fixed_ci_low"] for r in zuco]); fixed_hi=np.array([r["fixed_ci_high"] for r in zuco])
+    nested_lo=np.array([r["nested_ci_low"] for r in zuco]); nested_hi=np.array([r["nested_ci_high"] for r in zuco])
+    axes[1].errorbar(means, y-.09, xerr=[means-fixed_lo, fixed_hi-means], fmt="o", color=PALETTE["blue"], capsize=3, label="fixed 12; text bootstrap")
+    axes[1].errorbar(means, y+.09, xerr=[means-nested_lo, nested_hi-means], fmt="s", color=PALETTE["orange"], capsize=3, label="reader + text")
+    axes[1].axvline(0, color="#999999", lw=.8); axes[1].set_yticks(y, [r["contrast"].replace("gaze_vs_", "vs ") for r in zuco]); axes[1].set(xlabel="Fisher-z difference", title="ZuCo: two 95% intervals"); axes[1].legend(frameon=False, fontsize=6)
+    inv = data_global["invariance"]
+    vals = [inv["residual_distribution"][c]["pearson_dispersion"]["mean"] for c in ("provo", "zuco")]
+    axes[2].bar(("Provo", "ZuCo"), vals, color=(PALETTE["blue"], PALETTE["orange"]), width=.6)
+    axes[2].set(ylabel="Mean Pearson dispersion", title="Measurement non-equivalence")
+    axes[2].text(.5, .95, f"Domain balanced accuracy\n{inv['domain_distinguishability']['balanced_accuracy']:.3f}", transform=axes[2].transAxes, ha="center", va="top", fontsize=7)
+    made += _save(fig, output / "figure4_functional_evidence")
+    plt.close("all")
+    return made
+
+
+def _save(fig: Any, base: Path) -> list[Path]:
+    paths = []
+    for suffix, kwargs in ((".svg", {}), (".pdf", {}), (".png", {"dpi": 180})):
+        path = base.with_suffix(suffix); fig.savefig(path, bbox_inches="tight", **kwargs); paths.append(path)
+    return paths
+
+
+def _fmt(value: Any, digits: int = 4) -> Any:
+    return f"{value:.{digits}f}" if isinstance(value, float) else value
+
+
+def make_tables(data: dict[str, Any], extracted: dict[str, list[dict[str, Any]]], output: Path) -> list[Path]:
+    conversion = data["conversion"]; inv = data["invariance"]
+    audit = [
+        {"corpus": "Provo", "subjects": data["reliability"]["subjects"], "texts": inv["design"]["provo_texts"], "words": conversion["line_mapped_words"], "risk_set": data["reliability"]["risk_set"]},
+        {"corpus": "ZuCo NR", "subjects": len(data["transfer"]["design"]["subjects"]), "texts": inv["design"]["zuco_texts"], "words": inv["syntax_audit"]["zuco"]["tokens"], "risk_set": data["reliability"]["risk_set"]},
+    ]
+    sim = [{k: _fmt(r[k]) for k in ("subjects", "latent_effect", "overdispersion", "method", "latent_recovery_correlation_mean", "split_half_residual_reliability_mean")} for r in extracted["figure2"]]
+    spec_rows = []
+    for name in SPEC_ORDER:
+        row = data["specification"]["summary"][name]
+        spec_rows.append({"specification": name, "rank": data["specification"]["specifications"][name]["conditional_rank"],
+                          "nll_minus_uniform_median": _fmt(row["predictive_nll_minus_uniform"]["median"], 2),
+                          "edge_reliability_median": _fmt(row["reliability"]["edge_weighted"]["median"]),
+                          "null_median": _fmt(row["negative_control"]["edge_weighted"]["median"]),
+                          "raw_add_one_p": _fmt(row["negative_control"]["edge_weighted"]["raw_add_one_p"]),
+                          "primary_fwer_p": _fmt(row["negative_control"]["edge_weighted"]["primary_edge_weighted_fwer_p"]),
+                          "secondary_12_cell_fwer_p": _fmt(row["negative_control"]["edge_weighted"]["secondary_all_metrics_fwer_p"]),
+                          "null_repeats": data["specification"]["null_repeats"]})
+    functional = []
+    aux = data["aux_text"]
+    for condition in ("gaze", "mlm"):
+        row = aux["conditions"][condition]
+        functional.append({"dataset": "Provo", "endpoint": condition, "estimand": "correlation (r)", "estimate": _fmt(row["macro_text_equal_correlation_seed_averaged_fisher_z"], 5), "secondary": _fmt(row["pooled_edge_correlation"], 5), "ci95": "", "raw_p": "", "holm_p": "", "unit_direction": "10 fixed test texts; secondary=pooled r"})
+        functional.append({"dataset": "Provo", "endpoint": condition, "estimand": "MLM NLL", "estimate": _fmt(row["macro_text_equal_mlm_nll"], 5), "secondary": _fmt(row["pooled_token_mlm_nll"], 5), "ci95": "", "raw_p": "", "holm_p": "", "unit_direction": "text-equal; secondary=token-pooled; lower is better"})
+    holm = {"gaze_minus_shuffled": .00588, "gaze_minus_mlm": .02144, "gaze_minus_position": .00588}
+    for contrast in ("gaze_minus_shuffled", "gaze_minus_mlm", "gaze_minus_position"):
+        row = aux["comparisons"][contrast]
+        functional.append({"dataset": "Provo", "endpoint": contrast, "estimand": "paired per-text Fisher-z difference", "estimate": _fmt(row["mean"], 5), "secondary": "", "ci95": f"[{_fmt(row['ci95'][0], 5)}, {_fmt(row['ci95'][1], 5)}]", "raw_p": _fmt(row["signflip_p_two_sided"], 5), "holm_p": _fmt(holm[contrast], 5), "unit_direction": "10 texts; positive favors gaze"})
+    fixed = data["transfer"]["comparisons"]
+    nested = data["criterion"]["reader_bootstrap"]["summary"]
+    for contrast in ("gaze_vs_mlm", "gaze_vs_shuffled", "gaze_vs_position"):
+        point = fixed[contrast]["text_equal_fisher_z"]["mean_difference"]
+        fixed_ci = fixed[contrast]["text_equal_fisher_z"]["bootstrap_95_ci"]
+        ci = nested[contrast]["joint_reader_and_text"]["95_ci"]
+        functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "ci95": f"fixed-12 [{_fmt(fixed_ci[0])}, {_fmt(fixed_ci[1])}]; reader+text [{_fmt(ci[0])}, {_fmt(ci[1])}]", "raw_p": _fmt(fixed[contrast]["text_equal_fisher_z"]["signflip_two_sided_p"]), "holm_p": "", "unit_direction": "193 texts; positive favors gaze"})
+    supplement = []
+    for corpus in ("provo", "zuco"):
+        supplement.append({"audit": "residual dispersion", "corpus_or_endpoint": corpus, "estimate": _fmt(inv["residual_distribution"][corpus]["pearson_dispersion"]["mean"]), "range_or_status": "mean"})
+    supplement.append({"audit": "domain classification", "corpus_or_endpoint": "Provo vs ZuCo", "estimate": _fmt(inv["domain_distinguishability"]["balanced_accuracy"]), "range_or_status": "balanced accuracy"})
+    influence = data["influence"]
+    for name in SPEC_ORDER:
+        value = influence["provo_reliability"]["specifications"][name]["edge_weighted"]
+        supplement.append({"audit": "LOTO", "corpus_or_endpoint": name, "estimate": _fmt(value["full"]), "range_or_status": f"{_fmt(value['loto_range'][0])} to {_fmt(value['loto_range'][1])}"})
+    target = [{"category": category, **{k: audit[k] for k in ("candidate_edges", "candidate_sources", "observed_transition_count", "observed_transition_mass", "eligible_edges")}}
+              for category, audit in data["target_decomposition"]["candidate_and_observation_audit"].items()]
+    criterion = []
+    for metric, row in data["criterion"]["reliability"]["summary"].items():
+        criterion.append({"metric": metric, "partitions": row["n"], "median": _fmt(row["median"]), "q25": _fmt(row["q25"]), "q75": _fmt(row["q75"]), "median_text_negative": _fmt(row["text_negative_proportion"]["median"]), "median_text_undefined": _fmt(row["text_undefined_proportion"]["median"])})
+    residual = [{k: _fmt(row[k]) for k in ("specification", "analysis", "category", "stratum", "residual_type", "metric", "median", "q25", "q75", "median_defined_texts", "median_defined_edges")}
+                for row in data["residual_diagnostics"]["reliability_summary"] if row["metric"] == "edge_weighted"]
+    made = []
+    for stem, title, rows in (("table1_corpus_pipeline_audit", "Table 1. Corpus and pipeline audit", audit), ("table2_simulation_endpoints", "Table 2. Simulation endpoints", sim), ("table3_specification_results", "Table 3. Specification results", spec_rows), ("table4_functional_transfer", "Table 4. Functional and transfer results", functional), ("table_s1_invariance_loto", "Table S1. Invariance and LOTO audit", supplement), ("table_s2_target_decomposition", "Table S2. Target-selection decomposition audit", target), ("table_s3_criterion_uncertainty", "Table S3. ZuCo criterion uncertainty", criterion), ("table_s4_residual_diagnostics", "Table S4. Residual and exposure diagnostics", residual)):
+        made += _write_table(output / stem, title, rows)
+    return made
+
+
+def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, Any]:
+    global data_global
+    processed = root / "data" / "processed"
+    manuscript = root / "manuscript"; figures = manuscript / "figures"; tables = manuscript / "tables"; source = manuscript / "source_data"
+    for directory in (figures, tables, source): directory.mkdir(parents=True, exist_ok=True)
+    data, paths = load_primary(processed); data_global = data
+    extracted = extract_assets(data)
+    source_outputs = []
+    for name, rows in extracted.items():
+        path = source / f"{name}_source_data.csv"; _write_csv(path, rows); source_outputs.append(path)
+    figure_outputs = make_figures(extracted, figures)
+    table_outputs = make_tables(data, extracted, tables)
+    captions = manuscript / "figure_captions.md"
+    captions.write_text("""# Figure Captions\n\n**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.\n\n**Figure 2. The simulation reliability paradox.** Mean latent recovery and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under a null latent effect, omitted nuisance structure can yield high reliability without latent recovery.\n\n**Figure 3. Specification curve and permutation control.** Event-weighted held-out predictive NLL and text-median edge-pattern reliability for four predefined baseline models. Boxes summarize 100 randomized partitions of the fixed 84-reader sample; gray violins and ranges summarize 500 shared permutation-null replicates per specification. NLL and reliability use different weighting estimands. Add-one inference has minimum resolution 1/501; Table 3 reports raw and familywise max-statistic p values.\n\n**Figure 4. Functional and transfer evidence.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five optimization seeds on one fixed 10-text split. Seeds are optimization perturbations, not independent replicates; the horizontal line is the fixed-split text-equal macro correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader percentile text-bootstrap 95% interval and squares show the nested reader-and-text percentile interval; positive values favor gaze. The final panel summarizes cross-corpus measurement non-equivalence.\n""", encoding="utf-8")
+    all_outputs = source_outputs + figure_outputs + table_outputs + [captions]
+    script = root / "scripts" / "generate_manuscript_assets.py"
+    generated_at = timestamp or os.environ.get("SOURCE_DATE_EPOCH")
+    if generated_at and generated_at.isdigit(): generated_at = datetime.fromtimestamp(int(generated_at), timezone.utc).isoformat()
+    generated_at = generated_at or datetime.now(timezone.utc).isoformat()
+    secondary = {"half_audit", "target_decomposition", "residual_diagnostics", "aux_text", "aux_budget", "criterion", "invariance", "influence"}
+    input_records = [{"path": path.relative_to(root).as_posix(), "sha256": sha256(path), "status": "complete" if key != "conversion" else "audit_complete", "role": "secondary" if key in secondary else "primary", "kind": "compact_artifact"} for key, path in paths.items()]
+    input_records += [{"path": path.relative_to(root).as_posix(), "sha256": sha256(path), "status": "generated", "role": "secondary", "kind": "manuscript_asset"} for path in all_outputs]
+    manifest = manuscript / "artifact_manifest.csv"; _write_csv(manifest, input_records); all_outputs.append(manifest)
+    groups = {
+        "figure1": (["conversion", "reliability", "simulation"], ["/data_generating_process", "/summary", "/split"]),
+        "figure2": (["simulation"], ["/summary/*", "/config"]),
+        "figure3": (["specification"], ["/repeat_results/*", "/null_results/*", "/summary/*"]),
+        "figure4": ([f"seed_{s}" for s in (101,202,303,404,505)] + ["transfer", "criterion", "aux_text", "invariance"], ["/conditions/{mlm,gaze}/test", "/conditions/gaze/macro_text_equal_correlation_seed_averaged_fisher_z", "/comparisons/*/text_equal_fisher_z/bootstrap_95_ci", "/reader_bootstrap/summary/*/joint_reader_and_text", "/residual_distribution", "/domain_distinguishability"]),
+        "table1": (["conversion", "reliability", "transfer", "invariance"], ["/design", "/syntax_audit", "/line_mapped_words"]),
+        "table2": (["simulation"], ["/summary/*"]), "table3": (["specification"], ["/summary/*", "/specifications/*"]),
+        "table4": (["aux_text", "transfer", "criterion"], ["/conditions/*", "/comparisons/*/text_equal_fisher_z", "/reader_bootstrap/summary/*/joint_reader_and_text"]),
+        "table_s1": (["invariance", "influence"], ["/residual_distribution", "/domain_distinguishability", "/provo_reliability/specifications"]),
+        "table_s2": (["target_decomposition"], ["/candidate_and_observation_audit"]),
+        "table_s3": (["criterion"], ["/reliability/summary"]),
+        "table_s4": (["residual_diagnostics"], ["/reliability_summary"]),
+    }
+    assets = []
+    for asset, (keys, fields) in groups.items():
+        outputs = [p for p in all_outputs if p.name.startswith(asset)]
+        assets.append({"asset": asset, "inputs": [{"path": paths[k].relative_to(root).as_posix(), "sha256": sha256(paths[k])} for k in keys],
+                       "fields_and_transforms": fields + ["Filtering/order/summary only; no result constants"],
+                       "outputs": [{"path": p.relative_to(root).as_posix(), "sha256": sha256(p)} for p in outputs]})
+    provenance = {"schema_version": 1, "generated_at_utc": generated_at, "generation_note": "Timestamp is informational and excluded from all plotted/tabulated values.",
+                  "script": {"path": script.relative_to(root).as_posix(), "sha256": sha256(script)}, "superseded_inputs": [], "assets": assets,
+                  "manifest": {"path": manifest.relative_to(root).as_posix(), "sha256": sha256(manifest)},
+                  "acquisition_documentation": ["docs/data.md", "docs/zuco.md"]}
+    provenance_path = manuscript / "artifact_provenance.json"
+    provenance_path.write_text(json.dumps(provenance, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    return provenance
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate frozen manuscript figures, tables, source data, and provenance.")
+    parser.add_argument("--root", type=Path, default=ROOT)
+    parser.add_argument("--timestamp", help="Optional deterministic ISO-8601 timestamp")
+    args = parser.parse_args()
+    provenance = generate(args.root.resolve(), timestamp=args.timestamp)
+    print(f"Generated {len(provenance['assets'])} manuscript asset groups")
+
+
+data_global: dict[str, Any] = {}
+if __name__ == "__main__":
+    main()
