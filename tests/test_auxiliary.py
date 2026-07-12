@@ -111,4 +111,6 @@ def test_text_inference_averages_seeds_before_inference():
         runs.append({"seed": seed, "conditions": conditions})
     result, rows = analyze(runs, 100, 31, 7)
     assert result["comparisons"]["gaze_minus_mlm"]["texts"] == 2
+    assert result["comparisons"]["gaze_minus_mlm_nll"]["texts"] == 2
+    assert result["comparisons"]["gaze_minus_mlm_nll"]["mean"] == 0
     assert len(rows) == 16

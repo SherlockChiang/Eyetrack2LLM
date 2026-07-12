@@ -28,8 +28,27 @@ def bootstrap(values: np.ndarray, repeats: int, seed: int) -> list[float]:
     return np.quantile(means, (0.025, 0.975)).tolist()
 
 
-def analyze(runs: list[dict], repeats: int, signflips: int, seed: int) -> tuple[dict, list[dict]]:
+def analyze(runs: list[dict], repeats: int, signflips: int, seed: int,
+            existing: dict | None = None) -> tuple[dict, list[dict]]:
     texts = list(runs[0]["conditions"]["mlm"]["test"]["per_text"])
+    if existing is not None:
+        result = dict(existing)
+        nll_differences = [float(np.mean([
+            run["conditions"]["gaze"]["test"]["per_text"][text]["mlm_nll"]
+            - run["conditions"]["mlm"]["test"]["per_text"][text]["mlm_nll"]
+            for run in runs
+        ])) for text in texts]
+        values = np.asarray(nll_differences)
+        result["comparisons"]["gaze_minus_mlm_nll"] = {
+            "scale": "paired per-text mean NLL difference", "seed_aggregation": "mean before text inference",
+            "texts": len(values), "mean": float(values.mean()), "ci95": bootstrap(values, repeats, seed),
+            "signflip_p_two_sided": text_signflip(values, permutations=signflips, seed=seed),
+            "per_text": dict(zip(texts, nll_differences, strict=True)), "direction": "negative favors gaze",
+        }
+        rows = [{"seed": run["seed"], "condition": condition, "text_id": text,
+                 **run["conditions"][condition]["test"]["per_text"][text]}
+                for run in runs for condition in CONDITIONS for text in texts]
+        return result, rows
     rows = []
     conditions = {}
     for condition in CONDITIONS:
@@ -72,6 +91,23 @@ def analyze(runs: list[dict], repeats: int, signflips: int, seed: int) -> tuple[
             "signflip_p_two_sided": text_signflip(values, permutations=signflips, seed=seed),
             "per_text": dict(zip(texts, differences, strict=True)),
         }
+    nll_differences = []
+    for text in texts:
+        nll_differences.append(float(np.mean([
+            run["conditions"]["gaze"]["test"]["per_text"][text]["mlm_nll"]
+            - run["conditions"]["mlm"]["test"]["per_text"][text]["mlm_nll"]
+            for run in runs
+        ])))
+    nll_values = np.asarray(nll_differences)
+    comparisons["gaze_minus_mlm_nll"] = {
+        "scale": "paired per-text mean NLL difference",
+        "seed_aggregation": "mean before text inference",
+        "texts": len(nll_values), "mean": float(nll_values.mean()),
+        "ci95": bootstrap(nll_values, repeats, seed),
+        "signflip_p_two_sided": text_signflip(nll_values, permutations=signflips, seed=seed),
+        "per_text": dict(zip(texts, nll_differences, strict=True)),
+        "direction": "negative favors gaze",
+    }
     return {"status": "complete", "analysis_role": "fixed50 text-level inference", "seeds": [r["seed"] for r in runs],
             "test_texts": texts, "conditions": conditions, "comparisons": comparisons,
             "bootstrap_repeats": repeats, "signflip_permutations": signflips,
@@ -81,9 +117,11 @@ def analyze(runs: list[dict], repeats: int, signflips: int, seed: int) -> tuple[
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("inputs", nargs="+"); parser.add_argument("--output", required=True); parser.add_argument("--csv-output", required=True)
+    parser.add_argument("--existing", help="Existing inference artifact whose correlation fields should be retained")
     parser.add_argument("--bootstrap", type=int, default=100000); parser.add_argument("--signflips", type=int, default=99999); parser.add_argument("--seed", type=int, default=20260712)
     args = parser.parse_args(); runs = [json.loads(Path(path).read_text()) for path in args.inputs]
-    result, rows = analyze(runs, args.bootstrap, args.signflips, args.seed)
+    existing = json.loads(Path(args.existing).read_text()) if args.existing else None
+    result, rows = analyze(runs, args.bootstrap, args.signflips, args.seed, existing)
     Path(args.output).write_text(json.dumps(result, indent=2), encoding="utf-8")
     with Path(args.csv_output).open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0]); writer.writeheader(); writer.writerows(rows)
