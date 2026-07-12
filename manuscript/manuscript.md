@@ -1,5 +1,8 @@
 # The Reliability Paradox in Forward Target Selection: Measurement-Conditioned Cognitive Supervision in Natural Reading
 
+**Yuhan Jiang**
+Hong Kong Baptist University, Hong Kong SAR, China
+
 ## Abstract
 
 We study destination allocation conditional on the next retained transition being forward, within-sentence, and within-line. In simulation, omitted stable nuisance produced high half-sample pattern correlation despite near-zero latent recovery. Across 100 randomized partitions of the fixed 84-reader Provo sample, median text-level edge-pattern correlation was .765 under position-only adjustment and .472, .465, and .423 under lexical, syntax, and flexible specifications. Lexical, syntax, and flexible achieved lower event-weighted held-out destination loss. On one fixed 10-text split, gaze supervision had a small positive text-level association with held-out residuals but no detectable masked-language-model benefit. In ZuCo, reader-and-text uncertainty intervals for all three gaze-minus-control contrasts crossed zero. A secondary decomposition found greater observed mass and reproducibility at adjacent and near than sparse far destinations, but this gradient was measurement-sensitive. Thus reproducibility, predictive adequacy, construct-preserving adjustment, utility, and transport require separate evidence.
