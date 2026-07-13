@@ -22,6 +22,7 @@ SEED = 20260711
 SPECS = ("syntax", "flexible")
 EXPECTED_STRATA = ((0, .5), (.5, 1), (1, 5), (5, np.inf))
 EXPOSURE_STRATA = ((0, 5), (5, 10), (10, 25), (25, np.inf))
+HALF_ELIGIBILITY_THRESHOLDS = (1, 3, 5, 10)
 
 
 def fit_predictions(design, counts, folds):
@@ -141,9 +142,11 @@ def main():
     full_counts = np.sum(list(by_subject.values()), axis=0); full, category = {}, {}
     from eyetrack2llm.transfer import sentence_folds
     folds = sentence_folds(reference.text_id, 5, args.seed)
+    full_bundles = {}
     for name, design in designs.items():
         probability, _ = fit_predictions(design, full_counts, folds)
         bundle = residual_arrays(full_counts, probability, design.group_start, 10)
+        full_bundles[name] = bundle
         full[name] = full_diagnostics(design, bundle); category[name] = category_audit(design, full_counts, bundle)
     rows = []; thinning_audit = []
     seed_sequences = np.random.SeedSequence(args.seed).spawn(args.repeats)
@@ -158,6 +161,11 @@ def main():
         for name, design in designs.items():
             probabilities = [fit_predictions(design, counts, folds)[0] for counts in original_counts]
             original = [residual_arrays(counts, probabilities[i], design.group_start, 5) for i, counts in enumerate(original_counts)]
+            threshold_bundles = {
+                threshold: [residual_arrays(counts, probabilities[i], design.group_start, threshold)
+                            for i, counts in enumerate(original_counts)]
+                for threshold in HALF_ELIGIBILITY_THRESHOLDS
+            }
             thinned = [residual_arrays(thinned_counts[i], probabilities[i], design.group_start, 5) for i in range(2)]
             masks = category_masks(design.src_word, design.dst_word)
             selections = [("all", "all", None)] + [("category", c, m) for c, m in masks.items()]
@@ -176,6 +184,26 @@ def main():
                                      "category": label if analysis == "category" else "all", "stratum": label,
                                      "residual_type": value, "metric": metric, **stats[metric],
                                      "defined_edges": int(edge_mask.sum())})
+            for threshold, bundles in threshold_bundles.items():
+                for value in RESIDUAL_TYPES:
+                    stats = reliability(design, bundles[0], bundles[1], value)
+                    edge_mask = bundles[0]["reliable"] & bundles[1]["reliable"]
+                    for metric in ("edge_weighted", "source_equal_flatten"):
+                        rows.append({"repeat": repeat, "specification": name,
+                                     "analysis": "half_eligibility_threshold", "category": "all",
+                                     "stratum": f">={threshold}_each_half", "residual_type": value,
+                                     "metric": metric, **stats[metric], "defined_edges": int(edge_mask.sum())})
+            half_without_threshold = [residual_arrays(counts, probabilities[i], design.group_start, 0)
+                                      for i, counts in enumerate(original_counts)]
+            for value in RESIDUAL_TYPES:
+                stats = reliability(design, half_without_threshold[0], half_without_threshold[1], value,
+                                    full_bundles[name]["reliable"])
+                edge_mask = full_bundles[name]["reliable"]
+                for metric in ("edge_weighted", "source_equal_flatten"):
+                    rows.append({"repeat": repeat, "specification": name,
+                                 "analysis": "full84_eligibility_mask", "category": "all",
+                                 "stratum": ">=10_full84_only", "residual_type": value,
+                                 "metric": metric, **stats[metric], "defined_edges": int(edge_mask.sum())})
             for category_name, selected in masks.items():
                 for value in RESIDUAL_TYPES:
                     stats = reliability(design, thinned[0], thinned[1], value, selected)
@@ -193,6 +221,10 @@ def main():
             "deviance": "signed sqrt of 2[y log(y/E)-(y-E)], with 0 log(0/E)=0",
             "raw_deviation": "y-E", "limitation": "Cellwise signed deviance is a descriptive allocation of conditional multinomial group deviance; cells are dependent and it is not an independent-Poisson residual or a unique one-dimensional multinomial residual."},
         "thinning_design": "Within each subject and category, independently binomial-thin adjacent and near counts to that subject's far-category total mass when possible; retain every candidate edge and far counts. One seeded thinning draw per each of 100 independently randomized reader partitions. Original half-fitted nuisance probabilities are held fixed, so this isolates measurement mass rather than refitting consequences.",
+        "eligibility_sensitivity": {"primary_rule": "source exposure >=5 in each half",
+            "half_thresholds": list(HALF_ELIGIBILITY_THRESHOLDS),
+            "full84_rule": "source exposure >=10 in the fixed full-84 aggregate, applied to both half residual vectors without an additional half threshold",
+            "conditioning_note": "Exposure is an observed outcome count. Threshold sensitivity reuses each half's fitted probabilities and changes only the source eligibility rule."},
         "guardrail": "Lower far-category reproducibility indicates observed reproducibility under sparse measurement, not weaker latent structure. No edge-level significance tests are performed.",
         "full_sample": full, "target_category_exposure": category, "reliability_summary": summary,
         "repeat_rows": rows, "thinning_probabilities": thinning_audit}

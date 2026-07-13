@@ -12,7 +12,7 @@ from eyetrack2llm.auxiliary import (
     whole_word_mask,
 )
 from eyetrack2llm.torch import ResidualBottleneckAdapter
-from scripts.analyze_provo_text_inference import analyze
+from scripts.analyze_provo_text_inference import analyze, text_signflip
 
 
 def test_split_is_disjoint_and_fixed_size():
@@ -114,3 +114,9 @@ def test_text_inference_averages_seeds_before_inference():
     assert result["comparisons"]["gaze_minus_mlm_nll"]["texts"] == 2
     assert result["comparisons"]["gaze_minus_mlm_nll"]["mean"] == 0
     assert len(rows) == 16
+
+
+def test_text_signflip_enumerates_exactly_and_ignores_monte_carlo_arguments():
+    values = np.array([1.0, 2.0])
+    assert text_signflip(values, permutations=1, seed=1) == 0.5
+    assert text_signflip(values, permutations=99999, seed=999) == 0.5

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import itertools
 import json
 from pathlib import Path
 
@@ -11,15 +12,14 @@ CONDITIONS = ("mlm", "gaze", "shuffled", "position")
 
 
 def text_signflip(values: np.ndarray, permutations: int, seed: int) -> float:
-    """Two-sided Monte Carlo sign-flip test with add-one correction."""
+    """Two-sided exact sign-flip test by enumeration."""
     values = np.asarray(values, dtype=float)
     observed = abs(float(values.mean()))
-    rng = np.random.default_rng(seed)
-    exceedances = 0
-    for _ in range(permutations):
-        signs = rng.choice((-1.0, 1.0), size=len(values))
-        exceedances += abs(float((values * signs).mean())) >= observed
-    return (exceedances + 1) / (permutations + 1)
+    statistics = (
+        abs(float((values * np.asarray(signs)).mean()))
+        for signs in itertools.product((-1.0, 1.0), repeat=len(values))
+    )
+    return sum(statistic >= observed for statistic in statistics) / (2 ** len(values))
 
 
 def bootstrap(values: np.ndarray, repeats: int, seed: int) -> list[float]:
@@ -110,7 +110,7 @@ def analyze(runs: list[dict], repeats: int, signflips: int, seed: int,
     }
     return {"status": "complete", "analysis_role": "fixed50 text-level inference", "seeds": [r["seed"] for r in runs],
             "test_texts": texts, "conditions": conditions, "comparisons": comparisons,
-            "bootstrap_repeats": repeats, "signflip_permutations": signflips,
+            "bootstrap_repeats": repeats, "signflip_patterns": 2 ** len(texts),
             "target_disclosure": "Pearson residuals are centered/scaled by train-only median and 1.4826*MAD, then clipped to [-5,5]."}, rows
 
 
@@ -118,7 +118,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("inputs", nargs="+"); parser.add_argument("--output", required=True); parser.add_argument("--csv-output", required=True)
     parser.add_argument("--existing", help="Existing inference artifact whose correlation fields should be retained")
-    parser.add_argument("--bootstrap", type=int, default=100000); parser.add_argument("--signflips", type=int, default=99999); parser.add_argument("--seed", type=int, default=20260712)
+    parser.add_argument("--bootstrap", type=int, default=100000); parser.add_argument("--signflips", type=int, default=0, help="Ignored; exact sign enumeration is always used"); parser.add_argument("--seed", type=int, default=20260712)
     args = parser.parse_args(); runs = [json.loads(Path(path).read_text()) for path in args.inputs]
     existing = json.loads(Path(args.existing).read_text()) if args.existing else None
     result, rows = analyze(runs, args.bootstrap, args.signflips, args.seed, existing)

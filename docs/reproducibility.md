@@ -36,7 +36,7 @@ python scripts/run_auxiliary_experiment.py --fixations data/processed/provo_fixa
 Combine those five outputs for text-level inference:
 
 ```bash
-python scripts/analyze_provo_text_inference.py data/processed/provo_auxiliary_strictline_fixed50_seed101.json data/processed/provo_auxiliary_strictline_fixed50_seed202.json data/processed/provo_auxiliary_strictline_fixed50_seed303.json data/processed/provo_auxiliary_strictline_fixed50_seed404.json data/processed/provo_auxiliary_strictline_fixed50_seed505.json --output data/processed/provo_auxiliary_strictline_fixed50_text_inference.json --csv-output data/processed/provo_auxiliary_strictline_fixed50_text_inference.csv --bootstrap 100000 --signflips 99999 --seed 20260712
+python scripts/analyze_provo_text_inference.py data/processed/provo_auxiliary_strictline_fixed50_seed101.json data/processed/provo_auxiliary_strictline_fixed50_seed202.json data/processed/provo_auxiliary_strictline_fixed50_seed303.json data/processed/provo_auxiliary_strictline_fixed50_seed404.json data/processed/provo_auxiliary_strictline_fixed50_seed505.json --output data/processed/provo_auxiliary_strictline_fixed50_text_inference.json --csv-output data/processed/provo_auxiliary_strictline_fixed50_text_inference.csv --bootstrap 100000 --seed 20260712
 ```
 
 Convert the official ZuCo NR files, then evaluate transfer and uncertainty:
