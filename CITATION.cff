@@ -1,21 +1,21 @@
 cff-version: 1.2.0
 message: "Please cite the accompanying paper and this software release."
 title: "Eyetrack2LLM"
-version: "0.2.1"
+version: "0.2.2"
 date-released: "2026-07-14"
 license: MIT
-doi: "10.5281/zenodo.21348613"
+doi: "10.5281/zenodo.21348675"
 repository-code: "https://github.com/SherlockChiang/Eyetrack2LLM"
 url: "https://github.com/SherlockChiang/Eyetrack2LLM"
 identifiers:
   - type: doi
-    value: "10.5281/zenodo.21348613"
-    description: "Version-specific source and reproducibility artifact archive for v0.2.1"
+    value: "10.5281/zenodo.21348675"
+    description: "Version-specific source and reproducibility artifact archive for v0.2.2"
   - type: doi
     value: "10.5281/zenodo.21322671"
     description: "Concept DOI for all archived versions"
   - type: url
-    value: "https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.2.1"
+    value: "https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.2.2"
     description: "Matching GitHub source and reproducibility artifact release"
 authors:
   - family-names: "Jiang"
