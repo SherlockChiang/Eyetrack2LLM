@@ -12,7 +12,9 @@ import torch
 from torch import nn
 
 from eyetrack2llm import Fixations, extract_events, read_fixation_csv
-from eyetrack2llm.auxiliary import MODEL_ID, load_trainable_state_dict
+from eyetrack2llm.auxiliary import (CACHE_FORMAT_VERSION, MODEL_ID, MODEL_REVISION, canonical_sha256,
+    encoding_identity, file_sha256, load_trainable_state_dict, pretrained_provenance, text_sha256,
+    validate_checkpoint)
 from eyetrack2llm.baseline import WordMetadata, build_pair_design, count_vector, enrich_spacy_syntax, enrich_word_frequencies
 from eyetrack2llm.torch import LowRankDirectedHead, ResidualBottleneckAdapter, word_pool
 from eyetrack2llm.transfer import crossfit_residual_targets, relation_scores
@@ -57,21 +59,35 @@ def build_metadata(rows, nlp):
 
 
 def cache_hidden(metadata, path: Path):
-    fingerprint = {"model_id": MODEL_ID, "texts": list(TEXTS), "words": metadata.surface.tolist()}
+    from transformers import AutoModel, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, revision=MODEL_REVISION, use_fast=True, local_files_only=True)
+    provenance = pretrained_provenance()
+    source_words, encodings, identities = {}, {}, {}
+    for text in TEXTS:
+        positions = np.flatnonzero(metadata.text_id == text)
+        words = metadata.surface[positions].tolist()
+        encoded = tokenizer(words, is_split_into_words=True, return_tensors="pt")
+        ids = encoded.word_ids(0)
+        source_words[text] = words
+        encodings[text] = (encoded, ids)
+        identities[text] = encoding_identity(encoded, ids)
+    input_identity = {"text_sha256": text_sha256(source_words), "per_text": identities,
+                      "tokenization_sha256": canonical_sha256(identities)}
+    fingerprint = canonical_sha256({"format_version": CACHE_FORMAT_VERSION, "provenance": provenance,
+                                    "inputs": input_identity, "texts": list(TEXTS)})
     if path.exists():
         cached = torch.load(path, map_location="cpu", weights_only=False)
-        if cached.get("fingerprint") == fingerprint:
+        if cached.get("format_version") == CACHE_FORMAT_VERSION and cached.get("fingerprint") == fingerprint:
             return cached
-    from transformers import AutoModel, AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True, local_files_only=True)
-    encoder = AutoModel.from_pretrained(MODEL_ID, local_files_only=True).eval()
-    cached = {"fingerprint": fingerprint, "hidden_layer": "last", "texts": {}}
+    encoder = AutoModel.from_pretrained(MODEL_ID, revision=MODEL_REVISION, local_files_only=True).eval()
+    cached = {"format_version": CACHE_FORMAT_VERSION, "artifact_type": "zuco_transfer_bert_inputs",
+              "model_id": MODEL_ID, "model_revision": MODEL_REVISION, "provenance": provenance,
+              "inputs": input_identity, "fingerprint": fingerprint, "hidden_layer": "last", "texts": {}}
     with torch.inference_mode():
         for text in TEXTS:
-            positions = np.flatnonzero(metadata.text_id == text)
-            words = metadata.surface[positions].tolist()
-            encoded = tokenizer(words, is_split_into_words=True, return_tensors="pt")
-            ids = encoded.word_ids(0)
+            words = source_words[text]
+            encoded, ids = encodings[text]
             aligned = len(words) == len(set(x for x in ids if x is not None)) and all(ids.count(i) > 0 for i in range(len(words)))
             if not aligned or encoded.input_ids.shape[1] >= 512:
                 raise ValueError(f"BERT word alignment failed for {text}")
@@ -122,20 +138,18 @@ def paired_summary(results, first, second, seed=SEED, repeats=10000):
             text_values[text] = float(np.mean(a_z) - np.mean(b_z))
     values = np.asarray(list(text_values.values())); rng = np.random.default_rng(seed)
     bootstrap = np.mean(values[rng.integers(len(values), size=(repeats, len(values)))], axis=1)
-    signs = rng.choice((-1, 1), size=(repeats, len(values))); observed = abs(float(values.mean()))
     return {"overall_raw_descriptive": {"per_seed_differences": seed_differences,
                                          "mean_seed_difference": float(np.mean(seed_differences))},
             "text_equal_fisher_z": {"minimum_edges": 4, "texts_valid": len(values),
               "per_text_seed_averaged_differences": text_values, "mean_difference": float(values.mean()),
-              "bootstrap_95_ci": np.quantile(bootstrap, [.025, .975]).tolist(),
-              "signflip_two_sided_p": float((1 + np.count_nonzero(np.abs(np.mean(signs * values, axis=1)) >= observed)) / (repeats + 1))}}
+              "descriptive_text_resampling_interval": np.quantile(bootstrap, [.025, .975]).tolist()}}
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Zero-shot Provo gaze-relation transfer to all-subject ZuCo NR101-300")
-    parser.add_argument("--checkpoint-dir", default="data/processed/provo_checkpoints")
+    parser = argparse.ArgumentParser(description="Evaluate fixed Provo relation checkpoints on all-subject ZuCo NR101-300")
+    parser.add_argument("--checkpoint-dir", required=True)
     parser.add_argument("--cache", default="data/processed/zuco_transfer_bert.pt")
-    parser.add_argument("--output", default="data/processed/zuco_zero_shot_transfer.json")
+    parser.add_argument("--output", required=True)
     args = parser.parse_args(); processed = Path("data/processed")
     metadata_rows, fixation_items = {}, []
     for subject in SUBJECTS:
@@ -174,11 +188,17 @@ def main():
         results[str(seed)] = {}; checkpoint_metadata[str(seed)] = {}
         for condition in conditions:
             checkpoint = torch.load(checkpoints[(seed, condition)], map_location="cpu", weights_only=False)
+            validate_checkpoint(checkpoint, cache["provenance"], condition=condition, seed=seed)
             model = TransferModel(checkpoint["hidden_size"], checkpoint["rank"]); load_trainable_state_dict(model, checkpoint["state_dict"])
             results[str(seed)][condition] = model_result(model, cache, targets)
             checkpoint_metadata[str(seed)][condition] = {key: value for key, value in checkpoint.items() if key != "state_dict"}
     cosine = cosine_result(cache, targets)
-    output = {"status": "complete", "design": {"subjects": list(SUBJECTS), "texts": [TEXTS[0], TEXTS[-1]], "n_texts": len(TEXTS),
+    checkpoint_set_sha256 = canonical_sha256({seed: {condition: values[condition]["state_dict_sha256"]
+        for condition in conditions} for seed, values in checkpoint_metadata.items()})
+    output = {"status": "complete", "schema_version": 2, "model": MODEL_ID, "model_revision": MODEL_REVISION,
+              "pretrained_provenance": cache["provenance"], "cache_fingerprint": cache["fingerprint"],
+              "cache_file_sha256": file_sha256(args.cache), "checkpoint_set_sha256": checkpoint_set_sha256,
+              "design": {"subjects": list(SUBJECTS), "texts": [TEXTS[0], TEXTS[-1]], "n_texts": len(TEXTS),
               "event": "forward-only same-sentence same-line candidate risk set and counts", "aggregation": "sum counts over all 12 subjects", "min_source_exposure": 10,
               "baseline": "fixed-seed 5-fold sentence cross-fitting (160 train, 40 held out)", "folds": [{"train": train, "test": test} for train, test in folds],
               "feature_names": list(design.feature_names), "design_rank": design.design_rank(),

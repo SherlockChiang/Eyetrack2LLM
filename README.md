@@ -1,6 +1,6 @@
 # Eyetrack2LLM
 
-Eyetrack2LLM tests whether cross-fitted gaze-transition residual relations are reproducible, learnable, and transportable as cognitive supervision for language models. The estimand is destination allocation conditional on the next retained transition being forward, within sentence, and within line. It is not an unconditional next-fixation model, semantic distance, or causal effect.
+Eyetrack2LLM evaluates whether cross-fitted gaze-transition residual relations show fixed-split alignment and transport as candidate supervision for language models. The observational endpoint is destination allocation conditional on a retained transition already being forward, within-sentence, and within-line. It is not an intended saccade target, a first-pass-only measure, an unconditional next-fixation model, semantic distance, or causal effect; it can include rereading or regression-after-forward contexts.
 
 ## Install
 
@@ -15,7 +15,7 @@ The test suite is self-contained and downloads no data, models, or checkpoints.
 
 ## Data
 
-Provo and ZuCo participant data are not distributed here. Obtain them from their official sources and follow their licenses; see [data access](docs/data.md) and the [ZuCo conversion notes](docs/zuco.md). Local raw and processed files belong under `data/raw/` and `data/processed/`.
+Provo and ZuCo participant data are not distributed here. Obtain them from their official sources and follow their licenses; see [data access](docs/data.md) and the [ZuCo conversion notes](docs/zuco.md). Raw, participant-level, and full processed analysis files belong under local `data/raw/` and `data/processed/` directories. Aggregate summaries are public only when explicitly included in a versioned release attachment; none are in the current `PUBLIC_FILES.txt` allowlist.
 
 ## Minimal Reproduction
 
@@ -33,7 +33,7 @@ python scripts/run_zuco_transfer.py --help
 python scripts/audit_zuco_criterion_uncertainty.py --help
 ```
 
-Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). The immutable [Zenodo v0.1.2 archive](https://doi.org/10.5281/zenodo.21322672) preserves the historical release.
+Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). The source repository includes the manuscript-asset generator, scientific verifier, and exact-member compact-archive builder. Releases through `v0.1.2` are historical; this scientific revision is `v0.2.0`, and its prepared aggregate attachment has no matching permanent DOI yet.
 
 ## Citation And License
 

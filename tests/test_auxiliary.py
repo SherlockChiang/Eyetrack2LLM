@@ -3,16 +3,21 @@ import torch
 from torch import nn
 
 from eyetrack2llm.auxiliary import (
+    CHECKPOINT_FORMAT_VERSION,
     AuxiliaryModel,
+    canonical_sha256,
     make_split_manifest,
     signed_huber_source_balanced,
     source_preserving_shuffle,
     trainable_state_dict,
+    state_dict_sha256,
+    text_sha256,
+    validate_checkpoint,
     load_trainable_state_dict,
     whole_word_mask,
 )
 from eyetrack2llm.torch import ResidualBottleneckAdapter
-from scripts.analyze_provo_text_inference import analyze, text_signflip
+from scripts.analyze_provo_text_inference import analyze
 
 
 def test_split_is_disjoint_and_fixed_size():
@@ -97,6 +102,27 @@ def test_trainable_checkpoint_filter_and_load_equality():
         torch.testing.assert_close(clone.state_dict()[name], value)
 
 
+def test_provenance_hashes_are_canonical_and_boundary_sensitive():
+    assert canonical_sha256({"a": 1, "b": 2}) == canonical_sha256({"b": 2, "a": 1})
+    assert text_sha256({"1": ["ab", "c"]}) != text_sha256({"1": ["a", "bc"]})
+    assert text_sha256({"1": ["a"], "2": ["b"]}) != text_sha256({"1": ["a", "b"]})
+
+
+def test_checkpoint_validation_rejects_legacy_and_tampering():
+    state = {"weight": torch.tensor([[1.0, 2.0]])}
+    provenance = {"model": {"revision": "abc"}, "tokenizer": {"revision": "abc"}}
+    checkpoint = {"format_version": CHECKPOINT_FORMAT_VERSION, "base_provenance": provenance,
+                  "condition": "gaze", "seed": 7, "state_dict": state,
+                  "state_dict_sha256": state_dict_sha256(state)}
+    validate_checkpoint(checkpoint, provenance, condition="gaze", seed=7)
+    with np.testing.assert_raises_regex(ValueError, "schema-v2"):
+        validate_checkpoint({**checkpoint, "format_version": 1}, provenance)
+    with np.testing.assert_raises_regex(ValueError, "provenance"):
+        validate_checkpoint(checkpoint, {"model": {"revision": "other"}})
+    with np.testing.assert_raises_regex(ValueError, "hash mismatch"):
+        validate_checkpoint({**checkpoint, "state_dict": {"weight": torch.tensor([[9.0]])}}, provenance)
+
+
 def test_text_inference_averages_seeds_before_inference():
     runs = []
     for seed, shift in ((1, 0.0), (2, 0.1)):
@@ -109,14 +135,8 @@ def test_text_inference_averages_seeds_before_inference():
                                   "mlm_tokens": 2, "edge_predictions": [{"target": 0, "prediction": 0}, {"target": 1, "prediction": 1}]}
             conditions[condition] = {"test": {"per_text": per_text}}
         runs.append({"seed": seed, "conditions": conditions})
-    result, rows = analyze(runs, 100, 31, 7)
+    result, rows = analyze(runs, 100, 7)
     assert result["comparisons"]["gaze_minus_mlm"]["texts"] == 2
     assert result["comparisons"]["gaze_minus_mlm_nll"]["texts"] == 2
     assert result["comparisons"]["gaze_minus_mlm_nll"]["mean"] == 0
     assert len(rows) == 16
-
-
-def test_text_signflip_enumerates_exactly_and_ignores_monte_carlo_arguments():
-    values = np.array([1.0, 2.0])
-    assert text_signflip(values, permutations=1, seed=1) == 0.5
-    assert text_signflip(values, permutations=99999, seed=999) == 0.5

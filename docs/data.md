@@ -1,6 +1,6 @@
 # 数据接入
 
-本仓库不再分发 Provo、ZuCo、逐参与者数据、转换后的 fixation 表、模型 checkpoint 或 cache。使用者必须从下列官方来源自行获取数据，并分别遵守语料许可、引用和参与者数据条款；仓库的 MIT 许可不覆盖第三方数据。`data/raw/` 与 `data/processed/` 仅供本地使用并由根 `.gitignore` 排除。
+本仓库不分发 Provo、ZuCo、逐参与者数据、转换后的 fixation 表、模型 checkpoint 或 cache。使用者必须从下列官方来源自行获取数据，并分别遵守语料许可、引用和参与者数据条款；仓库的 MIT 许可不覆盖第三方数据。`data/raw/` 与 `data/processed/` 默认仅供本地使用并由根 `.gitignore` 排除；版本化 manuscript release 可单独提供经精确 allowlist 审核的 aggregate-results attachment，其中不含参与者级记录、fixation 表、checkpoint 或 cache。
 
 ## 规范化 fixation CSV
 

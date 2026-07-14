@@ -1,11 +1,13 @@
 # Limitations
 
-The estimand depends on the candidate risk set and nuisance specification. It is not an unconditional next-fixation model, semantic distance, or causal effect. Reproducibility is important for a stable supervision target but does not establish recovery of a latent cognitive relation.
+The observational endpoint depends on the candidate risk set and nuisance specification. It is not an intended saccade target, first-pass-only measure, unconditional next-fixation model, semantic distance, or causal effect. Fixed-sample partition agreement can support evaluation of a candidate behavioral target but does not estimate reader- or text-population reliability, validate cognitive supervision, or establish recovery of a latent cognitive relation.
 
-Optimization seeds are perturbations rather than independent data replicates. Provo learnability uses a fixed text split, while ZuCo transfer changes readers, texts, task, corpus, and layout together. Text-level resampling cannot isolate those changes.
+Optimization seeds are perturbations rather than independent data replicates and do not vary the fixed training-text schedule. Provo alignment uses one fixed text split, while ZuCo transfer changes readers, texts, task, corpus, and layout together. Descriptive text resampling cannot isolate those changes or supply design-based inference without justified exchangeability.
 
 The Provo estimand is sample-aggregate, not population-level. Source eligibility is outcome-conditioned by exposure; a 20-partition threshold audit found the primary threshold close to less selective rules, while a stricter threshold modestly increased correlation. Pearson, deviance, and raw-deviation reliability differ substantially, so each coefficient is conditional on its residual and variance specification.
 
-ZuCo reader-refit bootstrap intervals combined with conditional text reaggregation are sensitivity intervals. Text reaggregation does not enter nuisance refitting, and the pooled values are not independent draws from a full joint reader-by-text bootstrap.
+ZuCo reader-refit bootstrap intervals combined with conditional text reaggregation are sensitivity intervals. Text reaggregation does not enter nuisance refitting, and the pooled values are not independent draws from a full joint reader-by-text bootstrap. Edge-threshold results reaggregate the fixed observed-reader artifact only; they are not reader-refit threshold analyses.
+
+The common core omits cloze predictability to preserve a shared Provo-ZuCo feature universe. It also omits fixation-specific physical launch/landing geometry, word width, and visual angle. These omissions and outcome-conditioned source eligibility mean that linguistic and oculomotor variables may affect both entry into the retained-transition risk set and destination allocation conditional on entry. Associations within this selected risk set therefore need not equal associations in the full fixation process.
 
 The study does not identify individual traits, parafoveal processing, cognitive-model parameters, universal transport failure, or downstream language-model efficiency gains. Participant-level corpora and checkpoints cannot be redistributed by this repository.

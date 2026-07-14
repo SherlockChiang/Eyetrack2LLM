@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import importlib.metadata
+import platform
 import random
 import time
 from collections import defaultdict
@@ -16,6 +18,81 @@ from .baseline import PairDesign, count_vector, fit_baseline, residual_vector
 from .torch import LowRankDirectedHead, ResidualBottleneckAdapter, word_pool
 
 MODEL_ID = "google-bert/bert-base-uncased"
+MODEL_REVISION = "86b5e0934494bd15c9632b12f734a8a67f723594"
+CACHE_FORMAT_VERSION = 2
+CHECKPOINT_FORMAT_VERSION = 2
+
+
+def canonical_sha256(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def file_sha256(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def state_dict_sha256(state: dict[str, torch.Tensor]) -> str:
+    digest = hashlib.sha256()
+    for name in sorted(state):
+        tensor = state[name].detach().cpu().contiguous()
+        digest.update(name.encode("utf-8"))
+        digest.update(str(tensor.dtype).encode("ascii"))
+        digest.update(json.dumps(list(tensor.shape)).encode("ascii"))
+        digest.update(tensor.numpy().tobytes())
+    return digest.hexdigest()
+
+
+def runtime_versions() -> dict[str, str]:
+    packages = ("numpy", "torch", "transformers", "tokenizers", "huggingface-hub", "safetensors")
+    return {"python": platform.python_version(), **{name: importlib.metadata.version(name) for name in packages}}
+
+
+def pretrained_provenance() -> dict[str, object]:
+    from transformers.utils.hub import cached_file
+
+    files = {}
+    for filename in ("config.json", "model.safetensors", "tokenizer.json", "tokenizer_config.json", "vocab.txt"):
+        resolved = cached_file(MODEL_ID, filename, revision=MODEL_REVISION, local_files_only=True)
+        if resolved:
+            files[filename] = file_sha256(resolved)
+    tokenizer_files = {name: digest for name, digest in files.items() if name != "config.json" and name != "model.safetensors"}
+    return {
+        "model": {"id": MODEL_ID, "revision": MODEL_REVISION, "config_sha256": files["config.json"],
+                  "weights_sha256": files["model.safetensors"], "hidden_layer": "last"},
+        "tokenizer": {"id": MODEL_ID, "revision": MODEL_REVISION, "files_sha256": tokenizer_files,
+                      "bundle_sha256": canonical_sha256(tokenizer_files), "use_fast": True},
+        "runtime": runtime_versions(),
+    }
+
+
+def text_sha256(items: dict[str, list[str]]) -> str:
+    return canonical_sha256([{"text_id": text, "words": items[text]} for text in sorted(items, key=lambda x: int(x.split(":")[-1]))])
+
+
+def encoding_identity(encoded, word_ids: list[int | None]) -> dict[str, object]:
+    payload = {"input_ids": encoded.input_ids[0].tolist(), "attention_mask": encoded.attention_mask[0].tolist(),
+               "word_ids": word_ids}
+    if "token_type_ids" in encoded:
+        payload["token_type_ids"] = encoded.token_type_ids[0].tolist()
+    return {"sha256": canonical_sha256(payload), "tokens": len(payload["input_ids"])}
+
+
+def validate_checkpoint(checkpoint: dict[str, object], expected_provenance: dict[str, object], *, condition=None, seed=None) -> None:
+    if checkpoint.get("format_version") != CHECKPOINT_FORMAT_VERSION:
+        raise ValueError("Checkpoint lacks immutable schema-v2 pretrained provenance; recompute it")
+    if checkpoint.get("base_provenance") != expected_provenance:
+        raise ValueError("Checkpoint pretrained provenance does not match the active BERT cache")
+    if condition is not None and checkpoint.get("condition") != condition:
+        raise ValueError("Checkpoint condition metadata does not match its requested condition")
+    if seed is not None and checkpoint.get("seed") != seed:
+        raise ValueError("Checkpoint seed metadata does not match its requested seed")
+    if checkpoint.get("state_dict_sha256") != state_dict_sha256(checkpoint["state_dict"]):
+        raise ValueError("Checkpoint state-dict hash mismatch")
 
 
 def make_split_manifest(text_stats: dict[str, tuple[int, int]], seed: int = 20260711) -> dict[str, object]:
@@ -134,33 +211,44 @@ def signed_huber_source_balanced(prediction: torch.Tensor, target: torch.Tensor,
 
 def cache_bert_inputs(metadata, manifest: dict[str, object], cache_path: Path, seed: int) -> dict[str, object]:
     """Cache final-layer whole-text encoder states for clean and fixed masked inputs."""
-    fingerprint = hashlib.sha256(
-        json.dumps({"manifest": manifest, "mask_seed": seed}, sort_keys=True).encode("utf-8")
-    ).hexdigest()
-    if cache_path.exists():
-        cached = torch.load(cache_path, map_location="cpu", weights_only=False)
-        if (cached.get("fingerprint") == fingerprint and cached.get("texts")
-                and all("word_indices" in item for item in cached["texts"].values())):
-            return cached
     from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True, local_files_only=True)
-    bert_mlm = AutoModelForMaskedLM.from_pretrained(MODEL_ID, local_files_only=True).eval()
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, revision=MODEL_REVISION, use_fast=True, local_files_only=True)
+    provenance = pretrained_provenance()
+    split_by_text = {text: name for name, texts in manifest["splits"].items() for text in texts}
+    source_words, encodings, identities = {}, {}, {}
+    for text in sorted(split_by_text, key=int):
+        positions = np.flatnonzero(metadata.text_id == text)
+        positions = positions[np.argsort(metadata.word_index[positions])]
+        words = metadata.surface[positions].tolist()
+        encoded = tokenizer(words, is_split_into_words=True, return_tensors="pt")
+        word_ids = encoded.word_ids(0)
+        source_words[text] = words
+        encodings[text] = (positions, encoded, word_ids)
+        identities[text] = encoding_identity(encoded, word_ids)
+    input_identity = {"text_sha256": text_sha256(source_words), "per_text": identities,
+                      "tokenization_sha256": canonical_sha256(identities)}
+    fingerprint = canonical_sha256({"format_version": CACHE_FORMAT_VERSION, "manifest": manifest,
+                                    "mask_seed": seed, "provenance": provenance, "inputs": input_identity,
+                                    "mask_probability": 0.15, "train_variants": 8, "evaluation_variants": 3})
+    if cache_path.exists():
+        cached = torch.load(cache_path, map_location="cpu", weights_only=False)
+        if (cached.get("format_version") == CACHE_FORMAT_VERSION and cached.get("fingerprint") == fingerprint and cached.get("texts")
+                and all("word_indices" in item for item in cached["texts"].values())):
+            return cached
+    bert_mlm = AutoModelForMaskedLM.from_pretrained(MODEL_ID, revision=MODEL_REVISION, local_files_only=True).eval()
     encoder = bert_mlm.bert
     cache: dict[str, object] = {
-        "model_id": MODEL_ID,
+        "format_version": CACHE_FORMAT_VERSION, "artifact_type": "provo_auxiliary_bert_inputs",
+        "model_id": MODEL_ID, "model_revision": MODEL_REVISION, "provenance": provenance, "inputs": input_identity,
         "hidden_layer": "last",
         "fingerprint": fingerprint,
         "texts": {},
     }
-    split_by_text = {text: name for name, texts in manifest["splits"].items() for text in texts}
     with torch.no_grad():
         for ordinal, text in enumerate(sorted(split_by_text, key=int)):
-            positions = np.flatnonzero(metadata.text_id == text)
-            positions = positions[np.argsort(metadata.word_index[positions])]
-            words = metadata.surface[positions].tolist()
-            encoded = tokenizer(words, is_split_into_words=True, return_tensors="pt")
-            word_ids = encoded.word_ids(0)
+            positions, encoded, word_ids = encodings[text]
+            words = source_words[text]
             if encoded.input_ids.shape[1] >= 512 or any(word_ids.count(i) == 0 for i in range(len(words))):
                 raise ValueError(f"Whole-text BERT audit failed for text {text}: {encoded.input_ids.shape[1]} tokens")
             clean = encoder(**encoded, return_dict=True).last_hidden_state[0].to(torch.float16).cpu()

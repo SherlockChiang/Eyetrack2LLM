@@ -29,15 +29,27 @@ def subject_counts(design, events):
 def summarize_repeats(repeats, condition, metric):
     values = [row[condition]["text_summary"][metric]["median"] for row in repeats]
     return {"median": float(np.median(values)), "q25": float(np.quantile(values, .25)),
-            "q75": float(np.quantile(values, .75)), "range": [float(np.min(values)), float(np.max(values))]}
+             "q75": float(np.quantile(values, .75)), "range": [float(np.min(values)), float(np.max(values))]}
+
+
+def reader_bootstrap_draws(subjects, repeats, seed):
+    rng = np.random.default_rng(seed)
+    subjects = np.asarray(subjects)
+    draws = []
+    for _ in range(repeats):
+        sampled = subjects[rng.integers(len(subjects), size=len(subjects))]
+        sampled = sampled[rng.permutation(len(sampled))]
+        draws.append((sampled[:42].tolist(), sampled[42:].tolist()))
+    return draws
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Subject-independent Provo common-core residual reliability")
+    parser = argparse.ArgumentParser(description="Provo common-core fixed-sample agreement and reader-resampling sensitivity")
     parser.add_argument("--fixations", default="data/processed/provo_fixations_with_lines.csv")
     parser.add_argument("--main-csv", default="data/raw/Provo_Corpus-Eyetracking_Data.csv")
     parser.add_argument("--output", default="data/processed/provo_commoncore_independent_reliability.json")
     parser.add_argument("--repeats", type=int, default=100)
+    parser.add_argument("--reader-bootstraps", type=int, default=0)
     parser.add_argument("--seed", type=int, default=SEED)
     args = parser.parse_args()
     fixations = read_fixation_csv(args.fixations)
@@ -81,10 +93,31 @@ def main():
                for condition in ("independent", "shared")}
     summary["shared_minus_independent_median"] = {
         metric: summary["shared"][metric]["median"] - summary["independent"][metric]["median"] for metric in metrics}
+    bootstrap_records = []
+    for repeat, halves in enumerate(reader_bootstrap_draws(subjects, args.reader_bootstraps, args.seed + 1)):
+        counts = [np.sum([by_subject[subject] for subject in half], axis=0) for half in halves]
+        fitted = [crossfit_raw_residuals(design, value, seed=args.seed, min_exposure=5)[0]
+                  for value in counts]
+        bootstrap_records.append({
+            "repeat": repeat,
+            "unique_readers": [len(set(half)) for half in halves],
+            "shared_reader_identities": len(set(halves[0]) & set(halves[1])),
+            "agreement": paired_residual_metrics(*fitted),
+        })
+    bootstrap_summary = {
+        metric: summarize_repeats(bootstrap_records, "agreement", metric)
+        for metric in metrics
+    } if bootstrap_records else {}
     output = {"status": "complete" if args.repeats == 100 else "pilot", "seed": args.seed, "repeats": args.repeats,
               "subjects": len(subjects), "split": "42/42", "feature_set": "common_core",
               "risk_set": "common_forward_same_sentence_same_line", "text_crossfit_folds": 5, "min_half_source_exposure": 5,
               "target": "raw unclipped Pearson residual", "shared_control": "pooled 84-subject nuisance fit; half-specific counts/exposure",
+              "reader_resampling_sensitivity": {
+                  "role": "fixed-55-text outer reader-resampling sensitivity; not a joint reader-text confidence interval",
+                  "design": "sample 84 reader positions with replacement, randomly divide positions 42/42, preserve multiplicity, independently refit both halves",
+                  "seed": args.seed + 1, "repeats": args.reader_bootstraps,
+                  "summary": bootstrap_summary, "records": bootstrap_records,
+              },
               "syntax_audit": {key: value for key, value in syntax_audit.items() if key != "sentence_reports"},
               "summary": summary, "repeat_results": repeats}
     path = Path(args.output); path.parent.mkdir(parents=True, exist_ok=True)

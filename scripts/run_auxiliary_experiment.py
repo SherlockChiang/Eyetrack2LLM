@@ -14,9 +14,10 @@ import torch
 from torch.nn import functional as F
 
 from eyetrack2llm import extract_events, read_fixation_csv
-from eyetrack2llm.auxiliary import (MODEL_ID, AuxiliaryModel, build_gaze_targets, cache_bert_inputs,
-    load_trainable_state_dict, make_split_manifest, signed_huber_source_balanced, source_preserving_shuffle,
-    trainable_state_dict)
+from eyetrack2llm.auxiliary import (CHECKPOINT_FORMAT_VERSION, MODEL_ID, MODEL_REVISION, AuxiliaryModel,
+    build_gaze_targets, cache_bert_inputs, file_sha256, load_trainable_state_dict, make_split_manifest,
+    signed_huber_source_balanced, source_preserving_shuffle, state_dict_sha256, trainable_state_dict,
+    validate_checkpoint)
 from eyetrack2llm.baseline import (build_pair_design, count_vector, enrich_spacy_syntax,
     enrich_word_frequencies, read_provo_word_metadata)
 from eyetrack2llm.torch import word_pool
@@ -99,7 +100,7 @@ def main():
     position_median = float(np.median(position_train))
     position_scale = max(1.4826 * float(np.median(np.abs(position_train - position_median))), 1e-8)
     from transformers import AutoModelForMaskedLM
-    pretrained = AutoModelForMaskedLM.from_pretrained(MODEL_ID, local_files_only=True)
+    pretrained = AutoModelForMaskedLM.from_pretrained(MODEL_ID, revision=MODEL_REVISION, local_files_only=True)
     torch.manual_seed(args.seed); template = AuxiliaryModel(pretrained.config.hidden_size, copy.deepcopy(pretrained.cls), 16); initial = copy.deepcopy(template.state_dict())
     schedules = [(manifest["splits"]["train"][step % 35], step % 8) for step in range(args.steps)]
     results = {}; experiment_start = time.perf_counter()
@@ -110,10 +111,12 @@ def main():
         if args.load_checkpoint_dir:
             checkpoint_path = Path(args.load_checkpoint_dir) / f"provo_auxiliary_seed{args.seed}_{condition}.pt"
             checkpoint_data = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+            validate_checkpoint(checkpoint_data, cache["provenance"], condition=condition, seed=args.seed)
             load_trainable_state_dict(model, checkpoint_data["state_dict"])
             results[condition] = {
                 "lambda_gaze": 0.0 if condition == "mlm" else args.gaze_weight,
-                "selected_step": checkpoint_data["selected_step"], "checkpoint": str(checkpoint_path), "curves": [],
+                "selected_step": checkpoint_data["selected_step"], "checkpoint": str(checkpoint_path),
+                "checkpoint_state_sha256": checkpoint_data["state_dict_sha256"], "curves": [],
                 "val": evaluate(model, manifest["splits"]["val"], cache, targets, retain_predictions=args.retain_predictions),
                 "test": evaluate(model, manifest["splits"]["test"], cache, targets, retain_predictions=args.retain_predictions),
                 "wall_seconds": time.perf_counter() - started,
@@ -151,16 +154,24 @@ def main():
         if args.checkpoint_dir:
             checkpoint_path = Path(args.checkpoint_dir) / f"provo_auxiliary_seed{args.seed}_{condition}.pt"
             checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-            torch.save({"format_version": 1, "model_id": MODEL_ID, "hidden_size": pretrained.config.hidden_size,
+            state = trainable_state_dict(model)
+            torch.save({"format_version": CHECKPOINT_FORMAT_VERSION, "artifact_type": "provo_auxiliary_trainable_checkpoint",
+                        "model_id": MODEL_ID, "model_revision": MODEL_REVISION, "base_provenance": cache["provenance"],
+                        "cache_fingerprint": cache["fingerprint"], "manifest_sha256": file_sha256(manifest_path),
+                        "hidden_size": pretrained.config.hidden_size,
                         "rank": 16, "condition": condition, "seed": args.seed, "split_seed": args.split_seed,
                         "selected_step": selected_step,
                         "selection_metric": "fixed pre-registered step" if args.fixed_step is not None else "Provo validation MLM NLL",
                         "fixed_step": args.fixed_step,
-                        "state_dict": trainable_state_dict(model)}, checkpoint_path)
+                        "state_dict_sha256": state_dict_sha256(state), "state_dict": state}, checkpoint_path)
             checkpoint = str(checkpoint_path)
-        results[condition] = {"lambda_gaze": 0.0 if condition == "mlm" else args.gaze_weight, "selected_step": selected_step, "checkpoint": checkpoint, "curves": curves,
+        results[condition] = {"lambda_gaze": 0.0 if condition == "mlm" else args.gaze_weight, "selected_step": selected_step, "checkpoint": checkpoint,
+            "checkpoint_state_sha256": state_dict_sha256(trainable_state_dict(model)), "curves": curves,
             "val": evaluate(model, manifest["splits"]["val"], cache, targets, retain_predictions=args.retain_predictions), "test": evaluate(model, manifest["splits"]["test"], cache, targets, retain_predictions=args.retain_predictions), "wall_seconds": time.perf_counter() - started}
-    output = {"status": "complete", "model": MODEL_ID, "seed": args.seed, "split_seed": args.split_seed,
+    output = {"status": "complete", "schema_version": 2, "model": MODEL_ID, "model_revision": MODEL_REVISION,
+        "pretrained_provenance": cache["provenance"], "cache_fingerprint": cache["fingerprint"],
+        "cache_file_sha256": file_sha256(args.cache),
+        "manifest_sha256": file_sha256(manifest_path), "seed": args.seed, "split_seed": args.split_seed,
         "steps": args.steps, "eval_every": args.eval_every, "fixed_step": args.fixed_step,
         "manifest": str(manifest_path), "cache": str(args.cache), "feature_set": args.feature_set, "risk_set": args.risk_set,
         "feature_names": list(design.feature_names), "design_rank": design.design_rank(),

@@ -12,7 +12,7 @@ import numpy as np
 import torch
 
 from eyetrack2llm import extract_events, read_fixation_csv
-from eyetrack2llm.auxiliary import load_trainable_state_dict
+from eyetrack2llm.auxiliary import canonical_sha256, load_trainable_state_dict, validate_checkpoint
 from eyetrack2llm.baseline import (build_pair_design, count_vector, enrich_spacy_syntax,
                                    enrich_word_frequencies, read_provo_word_metadata)
 from eyetrack2llm.stability import (balanced_subject_subsets, crossfit_raw_residuals,
@@ -76,9 +76,13 @@ def frozen_scores(metadata, cache, checkpoint_dir):
     if len(seeds) != 5 or any((seed, c) not in paths for seed in seeds for c in ("gaze", "mlm", "shuffled", "position")):
         raise ValueError("Expected five complete frozen checkpoint sets")
     scores = {c: {text: [] for text in TEXTS} for c in ("gaze", "mlm", "shuffled", "position")}
+    state_hashes = {}
     for seed in seeds:
+        state_hashes[str(seed)] = {}
         for condition in scores:
             checkpoint = torch.load(paths[(seed, condition)], map_location="cpu", weights_only=False)
+            validate_checkpoint(checkpoint, cache["provenance"], condition=condition, seed=seed)
+            state_hashes[str(seed)][condition] = checkpoint["state_dict_sha256"]
             model = TransferModel(checkpoint["hidden_size"], checkpoint["rank"])
             load_trainable_state_dict(model, checkpoint["state_dict"]); model.eval()
             with torch.no_grad():
@@ -86,7 +90,8 @@ def frozen_scores(metadata, cache, checkpoint_dir):
                     item = cache["texts"][text]
                     scores[condition][text].append(relation_scores(
                         model.adapter, model.gaze_head, item["hidden"].float(), item["word_ids"]).numpy())
-    return {c: {text: np.asarray(value) for text, value in texts.items()} for c, texts in scores.items()}, seeds
+    return ({c: {text: np.asarray(value) for text, value in texts.items()} for c, texts in scores.items()},
+            seeds, canonical_sha256(state_hashes))
 
 
 def criterion_model_values(targets, scores):
@@ -158,7 +163,7 @@ def main():
     by_subject = counts_by_subject(design, events, SUBJECTS)
     partitions = unique_six_splits(SUBJECTS); partition_rows, reliability = partition_audit(design, by_subject, partitions, args.seed)
     full_targets = crossfit_raw_residuals(design, np.sum(list(by_subject.values()), axis=0), seed=args.seed, min_exposure=10)[0]
-    cache = cache_hidden(metadata, Path(args.cache)); scores, checkpoint_seeds = frozen_scores(metadata, cache, Path(args.checkpoint_dir))
+    cache = cache_hidden(metadata, Path(args.cache)); scores, checkpoint_seeds, checkpoint_set_sha256 = frozen_scores(metadata, cache, Path(args.checkpoint_dir))
     full_values, full_correlations = criterion_model_values(full_targets, scores)
     fixed12 = {name: {"mean": float(np.mean(list(values.values()))), "valid_texts": len(values)} for name, values in full_values.items()}
     ceiling = {}
@@ -180,6 +185,8 @@ def main():
     provo_partitions = [(tuple(x[:6]), tuple(x[6:])) for x in subsets]
     provo_rows, provo_summary = partition_audit(pd, pc, provo_partitions, args.seed)
     output = {"status": "complete" if args.reader_bootstraps >= 200 and args.provo_subsets >= 200 else "pilot",
+              "model_revision": cache["model_revision"], "pretrained_provenance": cache["provenance"],
+              "cache_fingerprint": cache["fingerprint"], "checkpoint_set_sha256": checkpoint_set_sha256,
               "seed": args.seed, "design": {"subjects": 12, "texts": 200, "partitions": len(partitions), "split": "6/6",
               "risk_set": "common_forward_same_sentence_same_line", "nuisance": "half-independent corpus-local 5-fold common-core fit",
               "target": "raw unclipped Pearson residual", "full_min_exposure": 10, "half_min_exposure": 5},

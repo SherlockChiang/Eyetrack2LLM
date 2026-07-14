@@ -22,6 +22,8 @@ src/eyetrack2llm/auxiliary.py
 src/eyetrack2llm/torch.py
 src/eyetrack2llm/transfer.py
 src/eyetrack2llm/target_selection.py
+src/eyetrack2llm/influence.py
+src/eyetrack2llm/invariance.py
 
 # Reproduction scripts
 scripts/convert_provo.py
@@ -32,9 +34,22 @@ scripts/analyze_provo_text_inference.py
 scripts/run_residual_recovery_simulation.py
 scripts/run_auxiliary_experiment.py
 scripts/run_zuco_transfer.py
+scripts/analyze_zuco_edge_threshold_sensitivity.py
 scripts/audit_zuco_criterion_uncertainty.py
 scripts/analyze_target_selection_decomposition.py
 scripts/analyze_residual_exposure_diagnostics.py
+scripts/analyze_half_specific_baseline_audit.py
+scripts/analyze_cross_corpus_invariance.py
+scripts/analyze_text_influence.py
+scripts/analyze_provo_reconciled_sensitivity.py
+scripts/audit_provo_word_reconciliation.py
+scripts/summarize_provo_budget.py
+scripts/generate_manuscript_assets.py
+scripts/build_compact_artifact_bundle.py
+scripts/verify_results.py
+scripts/check_release.py
+scripts/stage_public.py
+scripts/rebuild_release_assets.py
 
 # Public tests
 tests/test_transitions.py
@@ -44,9 +59,16 @@ tests/test_zuco.py
 tests/test_stability.py
 tests/test_simulation.py
 tests/test_auxiliary.py
+tests/test_provo_reader_bootstrap.py
 tests/test_torch.py
 tests/test_target_selection.py
 tests/test_specification_curve.py
+tests/test_zuco_threshold_sensitivity.py
+tests/test_half_specific_audit.py
+tests/test_influence.py
+tests/test_invariance.py
+tests/test_manuscript_assets.py
+tests/test_release_checker.py
 
 # Documentation
 docs/data.md
@@ -55,3 +77,8 @@ docs/reproducibility.md
 docs/zuco.md
 docs/methods.md
 docs/limitations.md
+docs/manuscript_assets.md
+docs/cross_corpus_invariance.md
+docs/text_influence.md
+docs/residual_exposure_diagnostics.md
+docs/target_selection_decomposition.md
