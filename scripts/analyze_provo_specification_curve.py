@@ -54,7 +54,7 @@ def crossfit(design, counts, seed, min_exposure):
             probability = model.predict(target)
             residual, exposure = residual_vector(values, probability, target.group_start)
             residuals[text] = {"residual": residual, "exposure": exposure,
-                               "reliable": exposure >= min_exposure,
+                               "reliable": (exposure >= min_exposure) & np.isfinite(residual),
                                "src": target.src_word, "dst": target.dst_word}
             nll -= float(values @ np.log(np.maximum(probability, 1e-300)))
             observations += float(values.sum())
@@ -79,54 +79,6 @@ def distribution(values):
         "median": float(np.median(values)), "q25": float(np.quantile(values, .25)),
         "q75": float(np.quantile(values, .75)),
         "range": [float(values.min()), float(values.max())],
-    }
-
-
-def permutation_inference(real, null):
-    observed = {
-        name: {metric: float(np.median([
-            item["reliability"][metric] for item in real[name]
-        ])) for metric in METRICS}
-        for name in SPECIFICATIONS
-    }
-    repeats = len(null[SPECIFICATIONS[0]])
-    if any(len(null[name]) != repeats for name in SPECIFICATIONS):
-        raise ValueError("Shared permutation families require aligned replicate counts")
-    for replicate in range(repeats):
-        indices = {null[name][replicate]["permutation_replicate"] for name in SPECIFICATIONS}
-        if indices != {replicate}:
-            raise ValueError("Shared permutation replicate indices are not aligned")
-
-    primary_max = [max(null[name][replicate]["reliability"]["edge_weighted"]
-                       for name in SPECIFICATIONS) for replicate in range(repeats)]
-    secondary_max = [max(null[name][replicate]["reliability"][metric]
-                         for name in SPECIFICATIONS for metric in METRICS)
-                     for replicate in range(repeats)]
-    cells = {}
-    for name in SPECIFICATIONS:
-        cells[name] = {}
-        for metric in METRICS:
-            threshold = observed[name][metric]
-            raw_null = [item["reliability"][metric] for item in null[name]]
-            cells[name][metric] = {
-                "observed_median": threshold,
-                "raw_add_one_p": (1 + sum(value >= threshold for value in raw_null)) / (repeats + 1),
-                "primary_edge_weighted_fwer_p": (
-                    (1 + sum(value >= threshold for value in primary_max)) / (repeats + 1)
-                    if metric == "edge_weighted" else None
-                ),
-                "secondary_all_metrics_fwer_p": (
-                    1 + sum(value >= threshold for value in secondary_max)
-                ) / (repeats + 1),
-            }
-    return {
-        "method": "add-one Monte Carlo exceedance (Phipson and Smyth, 2010)",
-        "shared_replicate_index": True,
-        "primary_family": "maximum edge_weighted reliability across four specifications",
-        "secondary_family": "maximum reliability across four specifications and three metrics",
-        "primary_null_maxima": primary_max,
-        "secondary_null_maxima": secondary_max,
-        "cells": cells,
     }
 
 
@@ -220,15 +172,14 @@ def main():
         for name, design in designs.items():
             fitted = [crossfit(design, value, args.seed, args.min_exposure)[0] for value in permuted]
             reliability = reliability_summary(paired_residual_metrics(*fitted))
-            null[name].append({"permutation_replicate": replicate, "reliability": reliability})
-            rows.append({"kind": "destination_permutation", "replicate": replicate,
+            null[name].append({"control_replicate": replicate, "reliability": reliability})
+            rows.append({"kind": "destination_destruction", "replicate": replicate,
                          "specification": name, **reliability,
                          "half1_nll_minus_uniform": "", "half2_nll_minus_uniform": ""})
 
     full_counts = np.sum(list(by_subject.values()), axis=0)
     full_residuals = {name: crossfit(design, full_counts, args.seed, 2 * args.min_exposure)[0]
                       for name, design in designs.items()}
-    inference = permutation_inference(real, null)
     summary = {}
     for name in SPECIFICATIONS:
         summary[name] = {
@@ -239,11 +190,12 @@ def main():
             "reliability": {metric: distribution([item["reliability"][metric] for item in real[name]])
                             for metric in METRICS},
             "negative_control": {
-                metric: {**distribution([item["reliability"][metric] for item in null[name]]),
-                         "empirical_exceedance": inference["cells"][name][metric]["raw_add_one_p"],
-                         "raw_add_one_p": inference["cells"][name][metric]["raw_add_one_p"],
-                         "primary_edge_weighted_fwer_p": inference["cells"][name][metric]["primary_edge_weighted_fwer_p"],
-                         "secondary_all_metrics_fwer_p": inference["cells"][name][metric]["secondary_all_metrics_fwer_p"]}
+                metric: {
+                    **distribution([item["reliability"][metric] for item in null[name]]),
+                    "observed_median_above_all_controls": float(np.median([
+                        item["reliability"][metric] for item in real[name]
+                    ])) > max(item["reliability"][metric] for item in null[name]),
+                }
                 for metric in METRICS
             },
         }
@@ -256,9 +208,8 @@ def main():
             "columns": design.features.shape[1], "conditional_rank": design.design_rank(),
             "group_constant_features": list(design.group_constant_features())}
             for name, design in designs.items()},
-        "negative_control": "500 shared replicate indices across four specifications and three metrics; destination-label permutation within source; independent derived RNG per half; each specification fitted separately; permutation replicate is inference unit",
+        "negative_control": "500 one-split destination-label destruction controls balanced across the 100-split bank; independent derived RNG per half; each specification fitted separately; controls are descriptive because they do not reproduce the observed 100-split summary statistic",
         "syntax_audit": {key: value for key, value in syntax_audit.items() if key != "sentence_reports"},
-        "permutation_inference": inference,
         "summary": summary, "full_sample_residual_identity": identity_correlations(full_residuals),
         "repeat_results": real, "null_results": null,
     }

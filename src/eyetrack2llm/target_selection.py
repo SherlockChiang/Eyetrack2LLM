@@ -125,8 +125,9 @@ def residual_arrays(counts, probability, group_start, min_exposure=5):
     expected = exposure * probability
     deviation = counts - expected
     variance = expected * (1.0 - probability)
+    structural = np.repeat(lengths, lengths) >= 2
     pearson = np.divide(deviation, np.sqrt(variance), out=np.full_like(deviation, np.nan),
-                        where=variance > 0)
+                        where=structural & (variance > 0))
     log_term = np.zeros_like(counts)
     positive = counts > 0
     valid = positive & (expected > 0)
@@ -136,7 +137,8 @@ def residual_arrays(counts, probability, group_start, min_exposure=5):
     deviance[(expected <= 0) & positive] = np.nan
     return {"pearson": pearson, "deviance": deviance, "raw_deviation": deviation,
             "probability": probability, "expected": expected, "exposure": exposure,
-            "risk_size": np.repeat(lengths, lengths), "reliable": exposure >= min_exposure}
+            "risk_size": np.repeat(lengths, lengths),
+            "reliable": (exposure >= min_exposure) & structural}
 
 
 def thin_subject_categories(counts, src, dst, rng, reference="far_same_line"):

@@ -30,7 +30,7 @@ def crossfit_residual_targets(design: PairDesign, counts: np.ndarray, *, n_folds
             target = subset_design(design, text)
             selected = design.text_id == text
             residual, exposure = residual_vector(counts[selected], model.predict(target), target.group_start)
-            reliable = exposure >= min_exposure
+            reliable = (exposure >= min_exposure) & np.isfinite(residual)
             targets[text] = {"residual": residual, "exposure": exposure, "reliable": reliable,
                              "src": target.src_word, "dst": target.dst_word}
     values = np.concatenate([item["residual"][item["reliable"]] for item in targets.values()])

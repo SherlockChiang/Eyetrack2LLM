@@ -35,14 +35,16 @@ def distribution(values):
 
 
 def residual_bundle(counts, probability, group_start, min_exposure):
+    from eyetrack2llm.baseline import residual_vector
+
     lengths = np.diff(group_start)
     exposure = np.repeat(np.add.reduceat(counts, group_start[:-1]), lengths)
     expected = exposure * probability
     deviation = counts - expected
-    residual = deviation / np.sqrt(expected * (1.0 - probability) + 1e-12)
+    residual, _ = residual_vector(counts, probability, group_start)
     return {"residual": residual, "deviation": deviation, "exposure": exposure,
             "expected": expected, "probability": probability,
-            "reliable": exposure >= min_exposure}
+            "reliable": (exposure >= min_exposure) & np.isfinite(residual)}
 
 
 def fit_predictions(design, counts, folds):

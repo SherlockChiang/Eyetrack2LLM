@@ -18,6 +18,7 @@ RISK_SET = "common_forward_same_sentence_same_line"
 MODEL_REVISION = "86b5e0934494bd15c9632b12f734a8a67f723594"
 MODEL_WEIGHTS_SHA256 = "68d45e234eb4a928074dfd868cead0219ab85354cc53d20e772753c6bb9169d3"
 TOKENIZER_BUNDLE_SHA256 = "1ce65d5305ef6778249d14620e39cb0e354a0312daa08640c644b1f339a41204"
+RESIDUAL_SUPPORT_POLICY = "source exposure threshold, risk-set size >=2, and positive finite Pearson variance"
 SUPERSEDED = {
     "provo_auxiliary_commoncore_fixed50_seed101.json", "provo_auxiliary_commoncore_fixed50_seed202.json",
     "provo_auxiliary_commoncore_fixed50_seed303.json", "provo_auxiliary_commoncore_fixed50_seed404.json",
@@ -97,6 +98,20 @@ def verify_arxiv_artifacts(*, require_bundle: bool = False) -> None:
     main = (arxiv / "main.tex").read_text(encoding="utf-8")
     for name in re.findall(r"\\(?:input|includegraphics)(?:\[[^]]*\])?\{([^}]+)\}", main):
         require((arxiv / name).is_file(), f"missing arXiv source dependency: arxiv/{name}")
+    table4 = (arxiv / "tables/table4.tex").read_text(encoding="utf-8")
+    require("0.05303" in table4 and "0.04780" in table4 and "0.0212" in table4, "arXiv Table 4 is not generated from current functional results")
+    require(".0386" not in table4 and ".0128" not in table4, "arXiv Table 4 contains superseded results")
+    table_s1 = (arxiv / "tables/table_s1.tex").read_text(encoding="utf-8")
+    require("3.1501" in table_s1 and "1.5289" in table_s1 and "0.7621 to 0.7668" in table_s1, "arXiv Table S1 is not generated from current complete artifacts")
+    require("3.0996" not in table_s1 and "1.4586" not in table_s1, "arXiv Table S1 contains smoke-run values")
+    table_s3 = (arxiv / "tables/table_s3_criterion_uncertainty.tex").read_text(encoding="utf-8")
+    require(".2837" in table_s3 and ".1846" in table_s3 and ".2839" not in table_s3, "arXiv Table S3 is not generated from the complete criterion artifact")
+    table_s4 = (arxiv / "tables/table_s4_residual_diagnostics.tex").read_text(encoding="utf-8")
+    require("0.5507 (0.5442, 0.5561)" in table_s4 and "0.8057" in table_s4 and "0.7983" in table_s4, "arXiv Table S4 is not generated from current residual diagnostics")
+    table_s6 = (arxiv / "tables/table_s6_zuco_edge_threshold_sensitivity.tex").read_text(encoding="utf-8")
+    require(len(re.findall(r"(?m)^4 .* & no \\\\$", table_s6)) == 3, "Table S6 primary threshold joint status is incorrect")
+    require(all(len(re.findall(rf"(?m)^{threshold} .* & yes \\\\$", table_s6)) == 3 for threshold in (10, 20, 30)), "Table S6 higher-threshold joint statuses are incorrect")
+    require("At no threshold" not in table_s6, "Table S6 contains a conclusion contradicted by its cells")
     if not require_bundle:
         return
     manifest_path = ROOT / "dist" / "arxiv_bundle_manifest.json"
@@ -149,7 +164,8 @@ def verify_full_local_results() -> None:
         require(data.get("design_rank") == 12, f"seed {seed}: expected rank-12 design")
         require(data.get("group_constant_features") == [], f"seed {seed}: group constants are not allowed")
         provenance = data.get("pretrained_provenance", {})
-        require(data.get("schema_version") == 2 and data.get("model_revision") == MODEL_REVISION, f"seed {seed}: BERT revision is not pinned")
+        require(data.get("schema_version") == 3 and data.get("model_revision") == MODEL_REVISION, f"seed {seed}: residual/BERT schema is not current")
+        require(data.get("residual_support_policy") == RESIDUAL_SUPPORT_POLICY, f"seed {seed}: residual support policy is not current")
         require(provenance.get("model", {}).get("weights_sha256") == MODEL_WEIGHTS_SHA256, f"seed {seed}: BERT weights hash mismatch")
         require(provenance.get("tokenizer", {}).get("bundle_sha256") == TOKENIZER_BUNDLE_SHA256, f"seed {seed}: tokenizer bundle hash mismatch")
         require(len(data.get("cache_file_sha256", "")) == 64, f"seed {seed}: cache file hash is missing")
@@ -160,7 +176,7 @@ def verify_full_local_results() -> None:
     text_inference = load("provo_auxiliary_strictline_fixed50_text_inference.json")
     require(text_inference.get("seeds") == list(SEEDS) and len(text_inference.get("test_texts", [])) == 10, "Provo text inference must average five seeds over 10 test texts")
     require(set(text_inference.get("conditions", {})) == CONTROLS, "Provo text inference conditions are incomplete")
-    require(all(value.get("valid_edges_per_seed") == 2838 for value in text_inference["conditions"].values()), "Provo text inference edge counts are incorrect")
+    require(all(value.get("valid_edges_per_seed") == 2800 for value in text_inference["conditions"].values()), "Provo text inference edge counts are incorrect")
     require(set(text_inference.get("comparisons", {})) == {"gaze_minus_mlm", "gaze_minus_shuffled", "gaze_minus_position", "gaze_minus_mlm_nll"}, "Provo text inference comparisons are incomplete")
     require(all(value.get("texts") == 10 and value.get("seed_aggregation") == "mean before text inference" for value in text_inference["comparisons"].values()), "Provo inference must not treat seeds as observations")
     budget = load("provo_auxiliary_strictline_budget_sensitivity.json")
@@ -170,7 +186,7 @@ def verify_full_local_results() -> None:
 
     transfer = load("zuco_transfer_strictline_fixed50.json")
     transfer_provenance = transfer.get("pretrained_provenance", {})
-    require(transfer.get("schema_version") == 2 and transfer.get("model_revision") == MODEL_REVISION, "transfer BERT revision is not pinned")
+    require(transfer.get("schema_version") == 3 and transfer.get("model_revision") == MODEL_REVISION, "transfer residual/BERT schema is not current")
     require(transfer_provenance.get("model", {}).get("weights_sha256") == MODEL_WEIGHTS_SHA256, "transfer BERT weights hash mismatch")
     require(transfer_provenance.get("tokenizer", {}).get("bundle_sha256") == TOKENIZER_BUNDLE_SHA256, "transfer tokenizer bundle hash mismatch")
     require(len(transfer.get("cache_fingerprint", "")) == 64 and len(transfer.get("cache_file_sha256", "")) == 64, "transfer cache identity is incomplete")
@@ -180,11 +196,12 @@ def verify_full_local_results() -> None:
     require(design.get("n_texts") == 200 and len(design.get("subjects", [])) == 12, "transfer must contain 200 texts and 12 subjects")
     require(design.get("design_rank") == 12 and len(design.get("feature_names", [])) == 12, "transfer must use the rank-12, 12-feature design")
     require(design.get("group_constant_features") == [], "transfer design contains group constants")
+    require(design.get("residual_support_policy") == RESIDUAL_SUPPORT_POLICY, "transfer residual support policy is not current")
     require(design.get("candidate_pairs") == 18247 and design.get("source_groups") == 3880, "transfer pair/group counts are incorrect")
     comparisons = transfer.get("comparisons", {})
     required_comparisons = {"gaze_vs_mlm", "gaze_vs_shuffled", "gaze_vs_position"}
     require(set(comparisons) == required_comparisons, "primary transfer comparisons are incomplete")
-    require(all(value.get("text_equal_fisher_z", {}).get("texts_valid") == 193 for value in comparisons.values()), "transfer comparisons must each have 193 primary valid texts")
+    require(all(value.get("text_equal_fisher_z", {}).get("texts_valid") == 192 for value in comparisons.values()), "transfer comparisons must each have 192 structurally eligible texts")
     require(all("descriptive_text_resampling_interval" in value.get("text_equal_fisher_z", {}) for value in comparisons.values()), "transfer comparisons must expose descriptive intervals")
 
     uncertainty = load("zuco_strictline_criterion_uncertainty.json")
@@ -196,6 +213,11 @@ def verify_full_local_results() -> None:
     require(udesign.get("partitions") == 462 and udesign.get("split") == "6/6", "ZuCo criterion audit requires all 462 unique 6/6 partitions")
     require(udesign.get("half_min_exposure") == 5 and udesign.get("full_min_exposure") == 10, "ZuCo criterion exposure thresholds are incorrect")
     require(uncertainty.get("reader_bootstrap", {}).get("repeats", 0) >= 200, "ZuCo audit requires at least 200 reader bootstraps")
+    support = uncertainty["reader_bootstrap"]["summary"]
+    for name in required_comparisons:
+        eligible = support[name].get("eligible_texts_per_reader_draw", {})
+        require(eligible.get("min") == 188 and eligible.get("max") == 199, f"{name}: reader-refit support range is missing or incorrect")
+        require(eligible.get("median") == 194 and eligible.get("q25") == 193 and eligible.get("q75") == 196, f"{name}: reader-refit support summary is missing or incorrect")
     require(uncertainty.get("provo_12_reader_sensitivity", {}).get("subsets", 0) >= 200, "Provo sensitivity requires at least 200 balanced 12-reader subsets")
     require(set(uncertainty.get("reliability", {}).get("summary", {})) == metrics, "ZuCo reliability summaries are incomplete")
     require_csv("zuco_strictline_criterion_uncertainty.csv")
@@ -206,6 +228,9 @@ def verify_full_local_results() -> None:
     require(len(reliability.get("repeat_results", [])) == 100, "independent reliability must contain 100 repeat results")
     summary = reliability.get("summary", {})
     require(metrics <= set(summary.get("independent", {})) and metrics <= set(summary.get("shared", {})), "independent reliability summary metrics are incomplete")
+    fisher_guard = reliability.get("per_source_fisher_guard_audit", {})
+    require(fisher_guard.get("clip") == [-0.9999999, 0.9999999], "per-source Fisher guard is not documented")
+    require(fisher_guard.get("defined_source_text_partition_instances") == 219850 and fisher_guard.get("two_destination_instances_lower_bound") == 24033, "per-source Fisher support audit is missing")
 
     simulation = load("residual_recovery_simulation.json")
     config = simulation.get("config", {})
@@ -228,7 +253,7 @@ def verify_full_local_results() -> None:
     require(all(len(curve.get("repeat_results", {}).get(name, [])) == 100 for name in expected_ranks), "specification repeat results are incomplete")
     require(all(all(len(item.get("per_text_metrics", {})) == 55 for item in curve["repeat_results"][name]) for name in expected_ranks), "specification repeats must retain 55 per-text metric records")
     require(all(len(curve.get("null_results", {}).get(name, [])) == 500 for name in expected_ranks), "specification negative controls are incomplete")
-    require(all([item.get("permutation_replicate") for item in curve["null_results"][name]] == list(range(500)) for name in expected_ranks), "shared permutation replicate indices are not aligned")
+    require(all([item.get("control_replicate") for item in curve["null_results"][name]] == list(range(500)) for name in expected_ranks), "destruction-control replicate indices are not aligned")
     require(curve.get("null_repeats") == 500, "specification descriptive control is incomplete")
     with (PROCESSED / "provo_strictline_specification_curve.csv").open(encoding="utf-8", newline="") as handle:
         curve_rows = list(csv.DictReader(handle))
@@ -263,6 +288,11 @@ def verify_full_local_results() -> None:
     require(diagnostics.get("candidate_universe_changed") is False, "exposure matching must preserve the candidate universe")
     require(set(diagnostics.get("residual_definitions", {})) >= {"pearson", "deviance", "raw_deviation", "limitation"}, "residual definitions are incomplete")
     require(any(row.get("analysis") == "exposure_matched" for row in diagnostics.get("reliability_summary", [])), "exposure-matched target sensitivity is missing")
+    adjacent = next(row for row in diagnostics["reliability_summary"] if row["specification"] == "syntax" and row["analysis"] == "category" and row["category"] == "adjacent" and row["residual_type"] == "pearson" and row["metric"] == "edge_weighted")
+    decomposed = decomposition["summary"]["syntax"]["adjacent"]["edge_weighted"]["observed_100_split"]
+    require(all(abs(adjacent[key] - decomposed[key]) < 1e-12 for key in ("median", "q25", "q75")), "decomposition and diagnostics use different Pearson support")
+    require(adjacent.get("median_defined_edges") == 2196, "adjacent Pearson support must exclude singleton zero-variance cells")
+    require(diagnostics["full_sample"]["syntax"]["pearson"]["n"] == 16504, "full-sample Pearson support must exclude 234 singleton cells")
     require_csv("provo_residual_exposure_diagnostics.csv")
 
     invariance = load("cross_corpus_measurement_invariance.json")
@@ -275,6 +305,8 @@ def verify_full_local_results() -> None:
     require(set(invariance.get("transport_calibration", {})) == {"provo", "zuco"}, "cross-corpus transport calibration is incomplete")
     require(invariance.get("domain_distinguishability", {}).get("unit") == "text" and invariance.get("domain_distinguishability", {}).get("label_permutations", 0) >= 500, "domain classification must use texts and at least 500 permutations")
     require(invariance.get("domain_distinguishability", {}).get("standardization", "").startswith("fold-local"), "domain classification standardization must be fold-local")
+    smoke_invariance = load("cross_corpus_measurement_invariance_smoke.json", require_complete=False)
+    require(smoke_invariance.get("status") == "pilot" and smoke_invariance.get("bootstrap_repeats", 0) < 1000, "cross-corpus smoke artifact must not advertise complete publication status")
 
     influence = load("text_influence_diagnostics.json")
     require(influence.get("provo_reliability", {}).get("texts") == 55 and influence.get("provo_reliability", {}).get("repeats") == 100, "influence diagnostics require 55 Provo texts and 100 repeats")
@@ -283,14 +315,15 @@ def verify_full_local_results() -> None:
     require(all(set(influence_specs[name]) == metrics for name in expected_ranks), "influence diagnostics require all three reliability metrics")
     require(all(len(result.get("leave_one_text_out", {})) == 55 for values in influence_specs.values() for result in values.values()), "each Provo influence result requires 55 deletions")
     transfer_influence = influence.get("zuco_transfer", {})
-    require(transfer_influence.get("texts") == 193 and set(transfer_influence.get("comparisons", {})) == required_comparisons, "influence diagnostics require three 193-text transfer comparisons")
-    require(all(len(result.get("leave_one_text_out", {})) == 193 for result in transfer_influence["comparisons"].values()), "each transfer influence result requires 193 deletions")
-    require(len(transfer_influence.get("joint_transfer", {}).get("supported_by_left_out_text", {})) == 193, "joint transfer influence rule requires 193 deletions")
+    require(transfer_influence.get("texts") == 192 and set(transfer_influence.get("comparisons", {})) == required_comparisons, "influence diagnostics require three 192-text transfer comparisons")
+    require(all(len(result.get("leave_one_text_out", {})) == 192 for result in transfer_influence["comparisons"].values()), "each transfer influence result requires 192 deletions")
+    require(len(transfer_influence.get("joint_transfer", {}).get("supported_by_left_out_text", {})) == 192, "joint transfer influence rule requires 192 deletions")
     influence_csv = PROCESSED / "text_influence_diagnostics.csv"
     require(influence_csv.is_file(), "missing text influence CSV")
     with influence_csv.open(encoding="utf-8", newline="") as handle:
         influence_rows = list(csv.DictReader(handle))
-    require(len(influence_rows) == 4 * 3 * 55 + 3 * 193, "text influence CSV row count is incorrect")
+    expected_influence_rows = 4 * 3 * influence["provo_reliability"]["texts"] + 3 * influence["zuco_transfer"]["texts"]
+    require(len(influence_rows) == expected_influence_rows, "text influence CSV row count is incorrect")
 
     conversion = load("provo_conversion_strictline_report.json", require_complete=False)
     audit = load("provo_word_line_audit.json", require_complete=False)

@@ -12,7 +12,7 @@ import torch
 from torch import nn
 
 from eyetrack2llm import Fixations, extract_events, read_fixation_csv
-from eyetrack2llm.auxiliary import (CACHE_FORMAT_VERSION, MODEL_ID, MODEL_REVISION, canonical_sha256,
+from eyetrack2llm.auxiliary import (CACHE_FORMAT_VERSION, MODEL_ID, MODEL_REVISION, RESIDUAL_SUPPORT_POLICY, canonical_sha256,
     encoding_identity, file_sha256, load_trainable_state_dict, pretrained_provenance, text_sha256,
     validate_checkpoint)
 from eyetrack2llm.baseline import WordMetadata, build_pair_design, count_vector, enrich_spacy_syntax, enrich_word_frequencies
@@ -140,7 +140,7 @@ def paired_summary(results, first, second, seed=SEED, repeats=10000):
     bootstrap = np.mean(values[rng.integers(len(values), size=(repeats, len(values)))], axis=1)
     return {"overall_raw_descriptive": {"per_seed_differences": seed_differences,
                                          "mean_seed_difference": float(np.mean(seed_differences))},
-            "text_equal_fisher_z": {"minimum_edges": 4, "texts_valid": len(values),
+            "text_equal_fisher_z": {"minimum_edges": 4, "texts_valid": len(values), "bootstrap_seed": seed,
               "per_text_seed_averaged_differences": text_values, "mean_difference": float(values.mean()),
               "descriptive_text_resampling_interval": np.quantile(bootstrap, [.025, .975]).tolist()}}
 
@@ -195,7 +195,7 @@ def main():
     cosine = cosine_result(cache, targets)
     checkpoint_set_sha256 = canonical_sha256({seed: {condition: values[condition]["state_dict_sha256"]
         for condition in conditions} for seed, values in checkpoint_metadata.items()})
-    output = {"status": "complete", "schema_version": 2, "model": MODEL_ID, "model_revision": MODEL_REVISION,
+    output = {"status": "complete", "schema_version": 3, "model": MODEL_ID, "model_revision": MODEL_REVISION,
               "pretrained_provenance": cache["provenance"], "cache_fingerprint": cache["fingerprint"],
               "cache_file_sha256": file_sha256(args.cache), "checkpoint_set_sha256": checkpoint_set_sha256,
               "design": {"subjects": list(SUBJECTS), "texts": [TEXTS[0], TEXTS[-1]], "n_texts": len(TEXTS),
@@ -204,7 +204,8 @@ def main():
               "feature_names": list(design.feature_names), "design_rank": design.design_rank(),
               "group_constant_features": list(design.group_constant_features()), "cloze_all_missing": True,
               "candidate_pairs": len(design.features), "source_groups": len(design.group_start) - 1,
-              "target_residual": "unclipped raw cross-fitted Pearson residual", "scaling": scaling},
+               "target_residual": "unclipped raw cross-fitted Pearson residual",
+               "residual_support_policy": RESIDUAL_SUPPORT_POLICY, "scaling": scaling},
               "audit": {"bert_word_alignment": float(np.mean([item["aligned"] for item in cache["texts"].values()])),
                         "bert_hidden_layer": cache["hidden_layer"], "max_bert_tokens": max(item["tokens"] for item in cache["texts"].values()),
                         "syntax": {key: value for key, value in syntax_audit.items() if key != "sentence_reports"}},

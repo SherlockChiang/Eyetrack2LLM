@@ -178,7 +178,9 @@ def main():
             for analysis, label, selected in selections:
                 for value in RESIDUAL_TYPES:
                     stats = reliability(design, original[0], original[1], value, selected)
-                    edge_mask = original[0]["reliable"] & original[1]["reliable"] & (True if selected is None else selected)
+                    edge_mask = (original[0]["reliable"] & original[1]["reliable"]
+                                 & np.isfinite(original[0][value]) & np.isfinite(original[1][value])
+                                 & (True if selected is None else selected))
                     for metric in ("edge_weighted", "source_equal_flatten"):
                         rows.append({"repeat": repeat, "specification": name, "analysis": analysis,
                                      "category": label if analysis == "category" else "all", "stratum": label,
@@ -187,7 +189,8 @@ def main():
             for threshold, bundles in threshold_bundles.items():
                 for value in RESIDUAL_TYPES:
                     stats = reliability(design, bundles[0], bundles[1], value)
-                    edge_mask = bundles[0]["reliable"] & bundles[1]["reliable"]
+                    edge_mask = (bundles[0]["reliable"] & bundles[1]["reliable"]
+                                 & np.isfinite(bundles[0][value]) & np.isfinite(bundles[1][value]))
                     for metric in ("edge_weighted", "source_equal_flatten"):
                         rows.append({"repeat": repeat, "specification": name,
                                      "analysis": "half_eligibility_threshold", "category": "all",
@@ -198,7 +201,8 @@ def main():
             for value in RESIDUAL_TYPES:
                 stats = reliability(design, half_without_threshold[0], half_without_threshold[1], value,
                                     full_bundles[name]["reliable"])
-                edge_mask = full_bundles[name]["reliable"]
+                edge_mask = (full_bundles[name]["reliable"] & np.isfinite(half_without_threshold[0][value])
+                             & np.isfinite(half_without_threshold[1][value]))
                 for metric in ("edge_weighted", "source_equal_flatten"):
                     rows.append({"repeat": repeat, "specification": name,
                                  "analysis": "full84_eligibility_mask", "category": "all",
@@ -207,7 +211,8 @@ def main():
             for category_name, selected in masks.items():
                 for value in RESIDUAL_TYPES:
                     stats = reliability(design, thinned[0], thinned[1], value, selected)
-                    edge_mask = thinned[0]["reliable"] & thinned[1]["reliable"] & selected
+                    edge_mask = (thinned[0]["reliable"] & thinned[1]["reliable"] & selected
+                                 & np.isfinite(thinned[0][value]) & np.isfinite(thinned[1][value]))
                     for metric in ("edge_weighted", "source_equal_flatten"):
                         rows.append({"repeat": repeat, "specification": name, "analysis": "exposure_matched",
                                      "category": category_name, "stratum": "subject_category_far_rate",
@@ -217,11 +222,13 @@ def main():
     output = {"status": "complete" if args.repeats >= 100 else "pilot", "seed": args.seed,
         "repeats": args.repeats, "subjects": len(subjects), "specifications": list(SPECS),
         "risk_set": "common_forward_same_sentence_same_line", "candidate_universe_changed": False,
-        "residual_definitions": {"pearson": "(y-E)/sqrt(E(1-p)); undefined where variance is zero",
+        "residual_definitions": {"pearson": "(y-E)/sqrt(E(1-p)); undefined for singleton risk sets or nonpositive variance",
             "deviance": "signed sqrt of 2[y log(y/E)-(y-E)], with 0 log(0/E)=0",
-            "raw_deviation": "y-E", "limitation": "Cellwise signed deviance is a descriptive allocation of conditional multinomial group deviance; cells are dependent and it is not an independent-Poisson residual or a unique one-dimensional multinomial residual."},
+            "raw_deviation": "y-E", "common_support": "All residual-scale comparisons exclude singleton risk sets, which contain no within-source destination allocation contrast.",
+            "limitation": "Cellwise signed deviance is a descriptive allocation of conditional multinomial group deviance; cells are dependent and it is not an independent-Poisson residual or a unique one-dimensional multinomial residual."},
         "thinning_design": "Within each subject and category, independently binomial-thin adjacent and near counts to that subject's far-category total mass when possible; retain every candidate edge and far counts. One seeded thinning draw per each of 100 independently randomized reader partitions. Original half-fitted nuisance probabilities are held fixed, so this isolates measurement mass rather than refitting consequences.",
         "eligibility_sensitivity": {"primary_rule": "source exposure >=5 in each half",
+            "partitions": args.repeats,
             "half_thresholds": list(HALF_ELIGIBILITY_THRESHOLDS),
             "full84_rule": "source exposure >=10 in the fixed full-84 aggregate, applied to both half residual vectors without an additional half threshold",
             "conditioning_note": "Exposure is an observed outcome count. Threshold sensitivity reuses each half's fitted probabilities and changes only the source eligibility rule."},

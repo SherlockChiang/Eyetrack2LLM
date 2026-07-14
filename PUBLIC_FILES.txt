@@ -50,6 +50,7 @@ scripts/verify_results.py
 scripts/check_release.py
 scripts/stage_public.py
 scripts/rebuild_release_assets.py
+scripts/migrate_descriptive_control_artifacts.py
 
 # Public tests
 tests/test_transitions.py

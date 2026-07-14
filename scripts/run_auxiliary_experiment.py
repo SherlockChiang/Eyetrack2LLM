@@ -14,7 +14,7 @@ import torch
 from torch.nn import functional as F
 
 from eyetrack2llm import extract_events, read_fixation_csv
-from eyetrack2llm.auxiliary import (CHECKPOINT_FORMAT_VERSION, MODEL_ID, MODEL_REVISION, AuxiliaryModel,
+from eyetrack2llm.auxiliary import (CHECKPOINT_FORMAT_VERSION, MODEL_ID, MODEL_REVISION, RESIDUAL_SUPPORT_POLICY, AuxiliaryModel,
     build_gaze_targets, cache_bert_inputs, file_sha256, load_trainable_state_dict, make_split_manifest,
     signed_huber_source_balanced, source_preserving_shuffle, state_dict_sha256, trainable_state_dict,
     validate_checkpoint)
@@ -159,7 +159,8 @@ def main():
                         "model_id": MODEL_ID, "model_revision": MODEL_REVISION, "base_provenance": cache["provenance"],
                         "cache_fingerprint": cache["fingerprint"], "manifest_sha256": file_sha256(manifest_path),
                         "hidden_size": pretrained.config.hidden_size,
-                        "rank": 16, "condition": condition, "seed": args.seed, "split_seed": args.split_seed,
+                         "rank": 16, "condition": condition, "seed": args.seed, "split_seed": args.split_seed,
+                         "residual_support_policy": RESIDUAL_SUPPORT_POLICY,
                         "selected_step": selected_step,
                         "selection_metric": "fixed pre-registered step" if args.fixed_step is not None else "Provo validation MLM NLL",
                         "fixed_step": args.fixed_step,
@@ -168,7 +169,7 @@ def main():
         results[condition] = {"lambda_gaze": 0.0 if condition == "mlm" else args.gaze_weight, "selected_step": selected_step, "checkpoint": checkpoint,
             "checkpoint_state_sha256": state_dict_sha256(trainable_state_dict(model)), "curves": curves,
             "val": evaluate(model, manifest["splits"]["val"], cache, targets, retain_predictions=args.retain_predictions), "test": evaluate(model, manifest["splits"]["test"], cache, targets, retain_predictions=args.retain_predictions), "wall_seconds": time.perf_counter() - started}
-    output = {"status": "complete", "schema_version": 2, "model": MODEL_ID, "model_revision": MODEL_REVISION,
+    output = {"status": "complete", "schema_version": 3, "model": MODEL_ID, "model_revision": MODEL_REVISION,
         "pretrained_provenance": cache["provenance"], "cache_fingerprint": cache["fingerprint"],
         "cache_file_sha256": file_sha256(args.cache),
         "manifest_sha256": file_sha256(manifest_path), "seed": args.seed, "split_seed": args.split_seed,
@@ -176,6 +177,7 @@ def main():
         "manifest": str(manifest_path), "cache": str(args.cache), "feature_set": args.feature_set, "risk_set": args.risk_set,
         "feature_names": list(design.feature_names), "design_rank": design.design_rank(),
         "group_constant_features": list(design.group_constant_features()), "min_source_exposure": 10,
+        "residual_support_policy": RESIDUAL_SUPPORT_POLICY,
         "scaling": scaling, "position_scaling": {"median": position_median, "normal_consistency_scale": position_scale, "clip": 5.0},
         "trainable_parameters": sum(p.numel() for p in template.parameters() if p.requires_grad), "total_wall_seconds": time.perf_counter() - experiment_start,
         "peak_rss_bytes": None, "peak_rss_note": "not recorded: psutil is not installed and Windows resource module is unavailable",

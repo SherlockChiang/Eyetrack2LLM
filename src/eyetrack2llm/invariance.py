@@ -118,9 +118,11 @@ def residual_audit(design: PairDesign, counts: np.ndarray, coefficients: np.ndar
     residual, exposure = residual_vector(counts, predict_probabilities(design, coefficients), design.group_start)
     rows = []
     for text in _texts(design):
-        mask = design.text_id == text; value = residual[mask]
+        mask = design.text_id == text
+        finite = mask & np.isfinite(residual)
+        value = residual[finite]
         rows.append([value.mean(), value.var(ddof=1), np.mean(np.abs(value) > 2),
-                     np.mean(value * value), exposure[mask].mean()])
+                     np.mean(value * value), exposure[finite].mean()])
     names = ["residual_mean", "residual_variance", "absolute_gt_2", "pearson_dispersion", "mean_exposure"]
     return {name: _summary(np.asarray(rows)[:, j]) for j, name in enumerate(names)}
 
@@ -167,7 +169,7 @@ def audit_corpora(a: PairDesign, ac: np.ndarray, b: PairDesign, bc: np.ndarray,
     at, ax, summary_names, ag = text_summaries(a, ac); bt, bx, _, bg = text_summaries(b, bc)
     coefficients = coefficient_audit(a, ac, b, bc, repeats, seed + 1)
     pa, pb = coefficients.pop("provo_model"), coefficients.pop("zuco_model")
-    result = {"status": "complete", "seed": seed, "bootstrap_repeats": repeats,
+    result = {"status": "complete" if repeats >= 1000 and permutations >= 500 else "pilot", "seed": seed, "bootstrap_repeats": repeats,
               "definitions": {"scope": "observable differences in cross-corpus measurement conditions, not strict psychometric invariance",
                 "unit": "text; edges are never bootstrap, CV, or classification units",
                 "bootstrap": "corpora independently resampled with replacement over texts",

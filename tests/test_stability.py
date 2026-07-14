@@ -59,3 +59,15 @@ def test_paired_metrics_report_negative_and_undefined_texts():
     summary = result["text_summary"]["edge_weighted"]
     assert summary["negative_proportion"] == 1
     assert summary["undefined_proportion"] == 0
+
+
+def test_crossfit_excludes_singleton_groups_from_residual_support():
+    design = PairDesign(np.zeros((5, 1)), np.array(["1", "2", "3", "4", "5"]),
+                        np.arange(5), np.arange(1, 6), np.arange(6), ("x",))
+    class Model:
+        def predict(self, target):
+            return np.ones(len(target.features))
+    targets, _ = crossfit_raw_residuals(design, np.full(5, 10), n_folds=5,
+                                        fitter=lambda *args, **kwargs: Model())
+    assert all(not item["reliable"].any() and np.isnan(item["residual"]).all()
+               for item in targets.values())

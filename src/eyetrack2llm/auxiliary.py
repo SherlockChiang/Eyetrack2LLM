@@ -20,7 +20,8 @@ from .torch import LowRankDirectedHead, ResidualBottleneckAdapter, word_pool
 MODEL_ID = "google-bert/bert-base-uncased"
 MODEL_REVISION = "86b5e0934494bd15c9632b12f734a8a67f723594"
 CACHE_FORMAT_VERSION = 2
-CHECKPOINT_FORMAT_VERSION = 2
+CHECKPOINT_FORMAT_VERSION = 3
+RESIDUAL_SUPPORT_POLICY = "source exposure threshold, risk-set size >=2, and positive finite Pearson variance"
 
 
 def canonical_sha256(value: object) -> str:
@@ -84,9 +85,11 @@ def encoding_identity(encoded, word_ids: list[int | None]) -> dict[str, object]:
 
 def validate_checkpoint(checkpoint: dict[str, object], expected_provenance: dict[str, object], *, condition=None, seed=None) -> None:
     if checkpoint.get("format_version") != CHECKPOINT_FORMAT_VERSION:
-        raise ValueError("Checkpoint lacks immutable schema-v2 pretrained provenance; recompute it")
+        raise ValueError("Checkpoint lacks immutable schema-v3 residual and pretrained provenance; recompute it")
     if checkpoint.get("base_provenance") != expected_provenance:
         raise ValueError("Checkpoint pretrained provenance does not match the active BERT cache")
+    if checkpoint.get("residual_support_policy") != RESIDUAL_SUPPORT_POLICY:
+        raise ValueError("Checkpoint residual-support policy does not match the active analysis")
     if condition is not None and checkpoint.get("condition") != condition:
         raise ValueError("Checkpoint condition metadata does not match its requested condition")
     if seed is not None and checkpoint.get("seed") != seed:
@@ -162,7 +165,7 @@ def build_gaze_targets(
         probability = fit_baseline(design, fit_counts, l2=1.0).predict(target)
         text_counts = counts[design.text_id == text]
         residual, exposure = residual_vector(text_counts, probability, target.group_start)
-        reliable = exposure >= min_exposure
+        reliable = (exposure >= min_exposure) & np.isfinite(residual)
         targets[text] = {"residual": residual, "reliable": reliable, "src": target.src_word, "dst": target.dst_word}
         if text in train:
             scaling_values.append(residual[reliable])

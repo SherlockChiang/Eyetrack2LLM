@@ -8,6 +8,7 @@ scipy==1.18.0
 torch==2.13.0
 transformers==5.13.1
 spacy==3.8.14
+en-core-web-sm==3.8.0
 thinc==8.3.13
 confection==1.3.3
 wordfreq==3.1.1
@@ -32,8 +33,8 @@ Full analysis and figures:
 
 ```bash
 python -m pip install -e ".[test,analysis,figures]"
-python -m spacy download en_core_web_sm
+python -m pip install "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 python -m pytest
 ```
 
-The spaCy model is intentionally not a core test dependency. Its real-parser integration test skips with a stated reason when spaCy or `en_core_web_sm` is unavailable. All other core failures remain failures.
+The official `en_core_web_sm` 3.8.0 wheel has SHA-256 `1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85`. The spaCy model is intentionally not a core test dependency. Its real-parser integration test skips with a stated reason when spaCy or `en_core_web_sm` is unavailable. All other core failures remain failures.

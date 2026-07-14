@@ -131,8 +131,10 @@ def bootstrap_audit(design, by_subject, scores, repeats, text_repeats, seed):
     for name in records[0]["contrasts"]:
         fixed = [x["contrasts"][name]["fixed_text_mean"] for x in records]
         nested = [v for x in records for v in x["contrasts"][name]["nested_text_means"]]
+        valid_texts = np.asarray([x["contrasts"][name]["valid_texts"] for x in records])
         summary[name] = {"reader_generalization_fixed_texts": {**distribution(fixed), "95_ci": np.quantile(fixed, [.025, .975]).tolist()},
-                         "joint_reader_and_text": {**distribution(nested), "95_ci": np.quantile(nested, [.025, .975]).tolist()}}
+                         "joint_reader_and_text": {**distribution(nested), "95_ci": np.quantile(nested, [.025, .975]).tolist()},
+                         "eligible_texts_per_reader_draw": {**distribution(valid_texts), "min": int(valid_texts.min()), "max": int(valid_texts.max())}}
     return records, summary
 
 
@@ -195,7 +197,7 @@ def main():
                                "per_condition_text_correlations": full_correlations},
               "reader_bootstrap": {"repeats": args.reader_bootstraps, "nested_text_repeats": args.text_bootstraps,
                                    "summary": bootstrap_summary, "records": bootstrap_records,
-                                   "distinction": "fixed12 text intervals condition on the observed readers; reader bootstrap targets reader-population generalization and nested resampling additionally varies texts."},
+                                    "distinction": "Fixed12 text intervals condition on the observed readers. Reader refits change both criterion values and eligible-text support; each draw averages its own eligible texts, and nested reaggregation samples only that draw-specific set. The pooled sensitivity distribution is not a fixed-text or independent joint bootstrap interval."},
               "provo_12_reader_sensitivity": {"subsets": args.provo_subsets, "selection": "balanced 12-reader subsets; deterministic 6/6 halves; exposure matched at 5 per half", "summary": provo_summary, "records": provo_rows},
               "syntax_audit": {k: v for k, v in syntax.items() if k != "sentence_reports"}}
     path = Path(args.output); path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(output, indent=2, allow_nan=False), encoding="utf-8")

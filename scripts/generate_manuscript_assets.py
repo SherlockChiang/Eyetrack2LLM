@@ -86,7 +86,7 @@ def extract_assets(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
             })
         for index, row in enumerate(spec["null_results"][name]):
             specification.append({
-                "specification": name, "kind": "permutation_null", "repeat": row.get("permutation_replicate", index),
+                "specification": name, "kind": "destruction_control", "repeat": row.get("control_replicate", index),
                 "nll_minus_uniform": "", "edge_weighted_reliability": row["reliability"]["edge_weighted"],
             })
     functional = []
@@ -195,7 +195,7 @@ def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> li
     positions = np.arange(1, 5)
     for i, name in enumerate(SPEC_ORDER):
         observed = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "observed"]
-        null = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "permutation_null"]
+        null = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "destruction_control"]
         violin = axes[1].violinplot([null], positions=[positions[i]-.14], widths=.22,
                                     showmeans=False, showmedians=True, showextrema=True)
         for body in violin["bodies"]:
@@ -203,7 +203,7 @@ def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> li
         for key in ("cmedians", "cmins", "cmaxes", "cbars"):
             violin[key].set_color(PALETTE["gray"]); violin[key].set_linewidth(.8)
         axes[1].boxplot([observed], positions=[positions[i]+.14], widths=.22, showfliers=False, patch_artist=True, boxprops={"facecolor": PALETTE["blue"], "alpha": .65})
-    axes[1].set_xticks(positions, [s.replace("_", "\n") for s in SPEC_ORDER]); axes[1].set_ylabel("Edge-weighted reliability, r")
+    axes[1].set_xticks(positions, [s.replace("_", "\n") for s in SPEC_ORDER]); axes[1].set_ylabel("Edge-weighted partition agreement, r")
     axes[1].set_title("Observed (blue) vs descriptive control (gray)")
     axes[1].text(.02, .98, "500 destination-label destruction controls", transform=axes[1].transAxes, va="top", fontsize=7)
     made += _save(fig, output / "figure3_specification_curve")
@@ -252,8 +252,8 @@ def _fmt(value: Any, digits: int = 4) -> Any:
 def make_tables(data: dict[str, Any], extracted: dict[str, list[dict[str, Any]]], output: Path) -> list[Path]:
     conversion = data["conversion"]; inv = data["invariance"]
     audit = [
-        {"corpus": "Provo", "subjects": data["reliability"]["subjects"], "texts": inv["design"]["provo_texts"], "mapped_positions_or_tokens": conversion["line_mapped_words"], "risk_set": data["reliability"]["risk_set"]},
-        {"corpus": "ZuCo NR", "subjects": len(data["transfer"]["design"]["subjects"]), "texts": inv["design"]["zuco_texts"], "mapped_positions_or_tokens": inv["syntax_audit"]["zuco"]["tokens"], "risk_set": data["reliability"]["risk_set"]},
+        {"corpus": "Provo", "subjects": data["reliability"]["subjects"], "input_texts": inv["design"]["provo_texts"], "primary_eligible_texts": inv["design"]["provo_texts"], "mapped_positions_or_tokens": conversion["line_mapped_words"], "risk_set": data["reliability"]["risk_set"]},
+        {"corpus": "ZuCo NR", "subjects": len(data["transfer"]["design"]["subjects"]), "input_texts": inv["design"]["zuco_texts"], "primary_eligible_texts": 192, "mapped_positions_or_tokens": inv["syntax_audit"]["zuco"]["tokens"], "risk_set": data["reliability"]["risk_set"]},
     ]
     sim = [{**{k: _fmt(r[k]) for k in ("subjects", "latent_effect", "overdispersion")},
             "method": METHOD_LABELS[r["method"]],
@@ -287,7 +287,7 @@ def make_tables(data: dict[str, Any], extracted: dict[str, list[dict[str, Any]]]
         point = fixed[contrast]["text_equal_fisher_z"]["mean_difference"]
         fixed_ci = fixed[contrast]["text_equal_fisher_z"]["descriptive_text_resampling_interval"]
         ci = nested[contrast]["joint_reader_and_text"]["95_ci"]
-        functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "interval_low": _fmt(fixed_ci[0]), "interval_high": _fmt(fixed_ci[1]), "interval_type": "fixed-12 descriptive text-resampling", "unit_direction": "193 observed texts; positive favors gaze"})
+        functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "interval_low": _fmt(fixed_ci[0]), "interval_high": _fmt(fixed_ci[1]), "interval_type": "fixed-12 descriptive text-resampling", "unit_direction": "192 structurally eligible texts; positive favors gaze"})
         functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "interval_low": _fmt(ci[0]), "interval_high": _fmt(ci[1]), "interval_type": "reader-refit sensitivity", "unit_direction": "conditional text reaggregation; positive favors gaze"})
     supplement = []
     for corpus in ("provo", "zuco"):
@@ -297,7 +297,7 @@ def make_tables(data: dict[str, Any], extracted: dict[str, list[dict[str, Any]]]
     for name in SPEC_ORDER:
         value = influence["provo_reliability"]["specifications"][name]["edge_weighted"]
         supplement.append({"audit": "LOTO", "corpus_or_endpoint": name, "estimate": _fmt(value["full"]), "range_or_status": f"{_fmt(value['loto_range'][0])} to {_fmt(value['loto_range'][1])}"})
-    target = [{"category": category, **{k: audit[k] for k in ("candidate_edges", "candidate_sources", "observed_transition_count", "observed_transition_mass", "eligible_edges")}}
+    target = [{"category": category, **{k: audit[k] for k in ("candidate_edges", "candidate_sources", "observed_nonzero_edges", "observed_transition_mass", "eligible_edges")}}
               for category, audit in data["target_decomposition"]["candidate_and_observation_audit"].items()]
     criterion = []
     for metric, row in data["criterion"]["reliability"]["summary"].items():
@@ -366,12 +366,12 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
             shutil.copyfile(path, arxiv_figures / path.name)
     table_outputs = make_tables(data, extracted, tables)
     captions = manuscript / "figure_captions.md"
-    captions.write_text("""# Figure Captions\n\n**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.\n\n**Figure 2. The simulation reliability paradox.** Mean correlation/alignment with the generating latent feature z and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under delta=0, omitted nuisance structure can yield high reliability while alignment with z is spurious. The conditional multinomial variance remains misspecified under Dirichlet overdispersion.\n\n**Figure 3. Bounded four-model nuisance-specification comparison and descriptive negative control.** Held-out predictive NLL is the average of the two half-specific event-weighted totals in each of 100 randomized partitions of the fixed 84-reader sample; reliability is a text-median edge-pattern correlation. Gray violins summarize 500 destination-label destruction controls, each computed from one split balanced across the 100-split bank. The control preserves source exposure and eligibility masks but is not a calibrated permutation test; no p value or familywise inference is reported.\n\n**Figure 4. Functional and transfer evidence.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five optimization seeds on one fixed 10-text split. Seeds are optimization perturbations, not independent replicates; the horizontal line is the fixed-split, equal-text, equal-seed back-transformed mean Fisher-z correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader descriptive text-resampling interval and squares show reader-refit bootstrap with conditional text-reaggregation sensitivity; positive values favor gaze.\n""", encoding="utf-8")
+    captions.write_text("""# Figure Captions\n\n**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.\n\n**Figure 2. The simulation reliability paradox.** Mean correlation/alignment with the generating latent feature z and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under delta=0, omitted nuisance structure can yield high reliability while alignment with z is spurious. The conditional multinomial variance remains misspecified under Dirichlet overdispersion.\n\n**Figure 3. Bounded four-model nuisance-specification comparison and descriptive negative control.** Held-out predictive NLL is the average of the two half-specific event-weighted totals in each of 100 randomized partitions of the fixed 84-reader sample; reliability is a text-median edge-pattern correlation. Gray violins summarize 500 destination-label destruction controls, each computed from one split balanced across the 100-split bank. The control preserves source exposure and eligibility masks but is not a calibrated permutation test; no p value or familywise inference is reported.\n\n**Figure 4. Functional and transfer evidence.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five run seeds on one fixed 10-text split. For gaze, MLM, and position the seeds perturb optimization; for shuffle they also select different within-source label permutations, so they are not independent replicates. The horizontal line is the fixed-split, equal-text, equal-seed back-transformed mean Fisher-z correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader descriptive text-resampling interval and squares show reader-refit sensitivity with draw-specific eligible-text support and conditional text reaggregation; positive values favor gaze.\n""", encoding="utf-8")
     captions.write_text(captions.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     caption_text = captions.read_text(encoding="utf-8")
     caption_text = caption_text.replace(
         "reliability is a text-median edge-pattern correlation. Gray violins",
-        "reliability is a text-median edge-pattern correlation. IQRs describe partition sensitivity, not confidence intervals. Gray violins",
+        "partition agreement is a text-median edge-pattern correlation. IQRs describe partition sensitivity, not confidence intervals. Gray violins",
     ).replace(
         "on one fixed 10-text split.",
         "on one fixed seeded 10-text split.",

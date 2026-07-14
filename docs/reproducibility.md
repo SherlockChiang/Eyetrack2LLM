@@ -6,13 +6,13 @@ Use Python 3.10 or newer and run commands from the repository root:
 
 ```bash
 python -m pip install ".[test,analysis]"
-python -m spacy download en_core_web_sm
+python -m pip install "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
 python -m pytest
 ```
 
 Tests require no corpus or model download. Analyses require official Provo or ZuCo inputs described in [data.md](data.md). The versioned manuscript release must provide the compact aggregate-results attachment described below. Paths are relative and work across platforms.
 
-The BERT analyses pin `google-bert/bert-base-uncased` to revision `86b5e0934494bd15c9632b12f734a8a67f723594`. Cache schema v2 hashes the resolved model/config/tokenizer files, exact word sequences and tokenization, masking policy, and relevant software versions. A legacy or mismatched cache is rebuilt. Checkpoint schema v2 stores matching provenance and deterministic trainable-state hashes; transfer rejects a mismatch.
+The syntax analyses pin `en_core_web_sm==3.8.0` to the official wheel above; its SHA-256 is `1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85`. Verify the installed model with `python -c "import importlib.metadata as m; assert m.version('en-core-web-sm') == '3.8.0'"`. The BERT analyses pin `google-bert/bert-base-uncased` to revision `86b5e0934494bd15c9632b12f734a8a67f723594`. Cache schema v2 hashes the resolved model/config/tokenizer files, exact word sequences and tokenization, masking policy, and relevant software versions. A legacy or mismatched cache is rebuilt. Checkpoint schema v3 additionally stores the residual-support policy, matching provenance, and deterministic trainable-state hashes; transfer rejects a mismatch.
 
 ## Main Analysis
 

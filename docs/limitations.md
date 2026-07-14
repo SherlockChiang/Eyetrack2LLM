@@ -4,7 +4,7 @@ The observational endpoint depends on the candidate risk set and nuisance specif
 
 Optimization seeds are perturbations rather than independent data replicates and do not vary the fixed training-text schedule. Provo alignment uses one fixed text split, while ZuCo transfer changes readers, texts, task, corpus, and layout together. Descriptive text resampling cannot isolate those changes or supply design-based inference without justified exchangeability.
 
-The Provo estimand is sample-aggregate, not population-level. Source eligibility is outcome-conditioned by exposure; a 20-partition threshold audit found the primary threshold close to less selective rules, while a stricter threshold modestly increased correlation. Pearson, deviance, and raw-deviation reliability differ substantially, so each coefficient is conditional on its residual and variance specification.
+The Provo estimand is sample-aggregate, not population-level. Source eligibility is outcome-conditioned by exposure; a 100-partition threshold audit found the primary threshold close to less selective rules, while a stricter threshold modestly increased correlation. Pearson, deviance, and raw-deviation pattern correlations differ substantially, so each coefficient is conditional on its residual and variance specification.
 
 ZuCo reader-refit bootstrap intervals combined with conditional text reaggregation are sensitivity intervals. Text reaggregation does not enter nuisance refitting, and the pooled values are not independent draws from a full joint reader-by-text bootstrap. Edge-threshold results reaggregate the fixed observed-reader artifact only; they are not reader-refit threshold analyses.
 

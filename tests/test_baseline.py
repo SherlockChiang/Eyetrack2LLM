@@ -89,10 +89,18 @@ def test_fit_beats_uniform_and_residual_mask_uses_source_exposure():
     )
     assert fitted_nll < uniform_nll
     residual, exposure = residual_vector(counts, probabilities, design.group_start)
-    assert np.isfinite(residual).all()
+    singleton = np.repeat(np.diff(design.group_start), np.diff(design.group_start)) == 1
+    assert np.isnan(residual[singleton]).all()
+    assert np.isfinite(residual[~singleton]).all()
     mask = exposure >= 5
     assert mask.all()
     assert mask[counts == 0].all()
+
+
+def test_singleton_conditional_group_has_undefined_residual():
+    residual, exposure = residual_vector(np.array([7.]), np.array([1.]), np.array([0, 1]))
+    assert exposure.tolist() == [7]
+    assert np.isnan(residual[0])
 
 
 def test_word_frequencies_are_finite_and_have_oov_flags():

@@ -22,6 +22,6 @@ Set `SOURCE_DATE_EPOCH` or pass `--timestamp` to make the informational provenan
 
 ## Provenance
 
-`manuscript/artifact_manifest.csv` inventories the allowlisted aggregate inputs and generated outputs and their SHA256 values. `manuscript/artifact_provenance.json` records, for every figure and table, input paths and hashes, JSON field paths and transformations, output paths and hashes, the generation-script hash, and acquisition-document references. Raw Provo and ZuCo corpora are deliberately not hashed again; acquisition locations and source hashes are documented in `docs/data.md` and `docs/zuco.md`.
+`manuscript/artifact_manifest.csv` inventories the allowlisted aggregate inputs and generated outputs and their SHA256 values. `manuscript/artifact_provenance.json` records, for every figure and table, input paths and hashes, JSON field paths and transformations, output paths and hashes, the generation-script hash, and acquisition-document references. Raw corpora are deliberately excluded from the aggregate bundle. Provo acquisition locations and source hashes are documented in `docs/data.md`; ZuCo acquisition and conversion procedures are documented in `docs/zuco.md`, which explicitly notes that the current conversion reports did not retain the 12 raw `.mat` hashes.
 
 Every figure has a corresponding CSV in `manuscript/source_data/`. Tables are emitted as both Markdown and CSV. Captions are maintained in `manuscript/figure_captions.md`; all figure text is English ASCII.

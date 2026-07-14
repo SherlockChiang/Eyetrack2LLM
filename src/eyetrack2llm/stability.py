@@ -63,7 +63,7 @@ def crossfit_raw_residuals(
             targets[text] = {
                 "residual": residual,
                 "exposure": exposure,
-                "reliable": exposure >= min_exposure,
+                "reliable": (exposure >= min_exposure) & np.isfinite(residual),
                 "src": target.src_word,
                 "dst": target.dst_word,
             }
@@ -112,7 +112,7 @@ def paired_residual_metrics(first: dict[str, dict[str, np.ndarray]], second: dic
         a, b = first[text], second[text]
         if not (np.array_equal(a["src"], b["src"]) and np.array_equal(a["dst"], b["dst"])):
             raise ValueError(f"Candidate mismatch for {text}")
-        eligible = a["reliable"] & b["reliable"]
+        eligible = a["reliable"] & b["reliable"] & np.isfinite(a["residual"]) & np.isfinite(b["residual"])
         per_text[text] = source_equal_metrics(a["residual"][eligible], b["residual"][eligible], a["src"][eligible])
     summary = {}
     for metric in ("edge_weighted", "source_equal_flatten", "per_source_fisher_equal"):

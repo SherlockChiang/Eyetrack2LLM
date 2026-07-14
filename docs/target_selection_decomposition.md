@@ -1,4 +1,4 @@
-# Secondary Forward Target-Selection Decomposition
+# Secondary Forward Destination-Allocation Decomposition
 
 ## Status And Scope
 
@@ -8,14 +8,14 @@ The categories describe **token separation** `d = destination token index - sour
 
 ## Results
 
-Values are medians across 100 independently generated 42/42 random splits of the same fixed 84-reader sample; brackets are split IQRs. The table reports text-equal edge-weighted reliability. Source-equal flatten estimates are retained in the artifact and lead to the same ordering.
+Values are medians across 100 randomized 42/42 splits of the same fixed 84-reader sample; brackets are partition IQRs. The table reports text-equal edge-weighted partition agreement. Source-equal flatten estimates are retained in the artifact and lead to the same ordering.
 
 | Specification | Adjacent | Near skip | Far same-line |
 |---|---:|---:|---:|
-| Position-only | `.9107 [.9081, .9137]` | `.8533 [.8495, .8570]` | `.2161 [.2024, .2286]` |
-| Lexical | `.7395 [.7339, .7471]` | `.6043 [.5918, .6136]` | `.1392 [.1291, .1530]` |
-| Syntax | `.7346 [.7271, .7416]` | `.5965 [.5860, .6049]` | `.1319 [.1244, .1466]` |
-| Flexible | `.7338 [.7257, .7420]` | `.5959 [.5869, .6064]` | `.1032 [.0964, .1125]` |
+| Position-only | `.9109 [.9082, .9138]` | `.8533 [.8495, .8570]` | `.2161 [.2024, .2286]` |
+| Lexical | `.7382 [.7328, .7465]` | `.6043 [.5918, .6136]` | `.1392 [.1291, .1530]` |
+| Syntax | `.7327 [.7242, .7399]` | `.5965 [.5860, .6049]` | `.1319 [.1244, .1466]` |
+| Flexible | `.7325 [.7238, .7401]` | `.5959 [.5869, .6064]` | `.1032 [.0964, .1125]` |
 
 | Category | Candidate edges | Sources | Observed nonzero edges | Observed mass | Eligible edges |
 |---|---:|---:|---:|---:|---:|
@@ -23,7 +23,7 @@ Values are medians across 100 independently generated 42/42 random splits of the
 | Near skip | 4,182 | 2,214 | 3,884 | 56,877 | 4,179 |
 | Far same-line | 10,119 | 1,743 | 1,863 | 3,813 | 10,115 |
 
-All defined edge-weighted and source-equal observed medians exceed all 25 destination-permutation replicates, so their add-one exceedance is `1/26=.03846`; this is coarse Monte Carlo resolution, not an exact tail probability. Adjacent has exactly one candidate within each source/category. Its across-source edge correlation is defined, but source-equal within-source correlation and per-source Fisher aggregation are undefined (`0` defined split replicates) and are not imputed. Near-skip per-source Fisher values are close to one partly because most contributing sources have only two category candidates, making each defined two-point correlation nearly `+1` or `-1`; these values should not be treated as the main effect size.
+All defined edge-weighted and source-equal observed medians exceed all 25 destination-label destruction controls. This is descriptive separation only because each control uses one split rather than reproducing the observed 100-split statistic; no p value is defined. Adjacent has exactly one candidate within each source/category. Its across-source edge correlation is defined, but source-equal within-source correlation and per-source Fisher aggregation are undefined (`0` defined split replicates) and are not imputed. Near-skip per-source Fisher values are close to one partly because most contributing sources have only two category candidates, making each defined two-point correlation nearly `+1` or `-1`; these values should not be treated as the main effect size.
 
 ## Interpretation
 

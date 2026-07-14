@@ -20,7 +20,6 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
     results = payload["seed_results"]
     seeds = sorted(results, key=int)
     texts = sorted(next(iter(results.values()))["gaze"]["per_text"])
-    rng = np.random.default_rng(seed)
     rows = []
     threshold_results = {}
     for threshold in thresholds:
@@ -46,8 +45,16 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
                 right_z = np.arctanh(np.clip([pair[1] for pair in pairs], -1 + 1e-7, 1 - 1e-7))
                 values[text] = float(np.mean(left_z - right_z))
             array = np.asarray(list(values.values()))
-            draws = array[rng.integers(len(array), size=(bootstrap, len(array)))].mean(axis=1)
-            interval = np.quantile(draws, (0.025, 0.975)).tolist()
+            if threshold == 4:
+                interval = payload["comparisons"][name]["text_equal_fisher_z"]["descriptive_text_resampling_interval"]
+                interval_source = "frozen primary transfer interval"
+                interval_seed = payload["comparisons"][name]["text_equal_fisher_z"].get("bootstrap_seed")
+            else:
+                interval_seed = seed + threshold * 100 + list(CONTRASTS).index(name) + 1
+                rng = np.random.default_rng(interval_seed)
+                draws = array[rng.integers(len(array), size=(bootstrap, len(array)))].mean(axis=1)
+                interval = np.quantile(draws, (0.025, 0.975)).tolist()
+                interval_source = "threshold-specific descriptive text resampling"
             strata = {
                 label: sum(low <= minimum_edges[text] <= high for text in texts)
                 for label, low, high in (("4-9", 4, 9), ("10-19", 10, 19), ("20-29", 20, 29), ("30+", 30, float("inf")))
@@ -58,6 +65,8 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
                 "texts_retained": len(values),
                 "mean_difference": float(array.mean()),
                 "descriptive_text_resampling_interval": interval,
+                "interval_source": interval_source,
+                "interval_seed": interval_seed,
                 "directionally_separated_from_zero": bool(interval[0] > 0 or interval[1] < 0),
                 "max_absolute_raw_correlation": float(np.max(np.abs(raw))),
                 "max_absolute_fisher_z": float(np.max(np.abs(np.arctanh(np.clip(raw, -1 + 1e-7, 1 - 1e-7))))),
@@ -81,6 +90,7 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
         "analysis_role": "descriptive edge-threshold sensitivity on frozen fixed-reader transfer results",
         "bootstrap_repeats": bootstrap,
         "seed": seed,
+        "derived_seed_rule": "base seed + 100*threshold + one-based contrast index; threshold 4 reuses frozen primary intervals",
         "thresholds": list(thresholds),
         "results": threshold_results,
     }, rows

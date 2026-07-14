@@ -111,11 +111,13 @@ def test_provenance_hashes_are_canonical_and_boundary_sensitive():
 def test_checkpoint_validation_rejects_legacy_and_tampering():
     state = {"weight": torch.tensor([[1.0, 2.0]])}
     provenance = {"model": {"revision": "abc"}, "tokenizer": {"revision": "abc"}}
+    from eyetrack2llm.auxiliary import RESIDUAL_SUPPORT_POLICY
     checkpoint = {"format_version": CHECKPOINT_FORMAT_VERSION, "base_provenance": provenance,
+                  "residual_support_policy": RESIDUAL_SUPPORT_POLICY,
                   "condition": "gaze", "seed": 7, "state_dict": state,
                   "state_dict_sha256": state_dict_sha256(state)}
     validate_checkpoint(checkpoint, provenance, condition="gaze", seed=7)
-    with np.testing.assert_raises_regex(ValueError, "schema-v2"):
+    with np.testing.assert_raises_regex(ValueError, "schema-v3"):
         validate_checkpoint({**checkpoint, "format_version": 1}, provenance)
     with np.testing.assert_raises_regex(ValueError, "provenance"):
         validate_checkpoint(checkpoint, {"model": {"revision": "other"}})

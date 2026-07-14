@@ -51,7 +51,7 @@ def candidate_audit(design, counts, min_exposure):
             "candidate_edges": int(selected.sum()),
             "candidate_sources": len(keys),
             "candidate_texts": len(set(design.text_id[selected].tolist())),
-            "observed_transition_count": int(np.count_nonzero(counts[selected])),
+            "observed_nonzero_edges": int(np.count_nonzero(counts[selected])),
             "observed_transition_mass": float(counts[selected].sum()),
             "eligible_edges": int(eligible.sum()),
             "eligible_sources": len(set(zip(design.text_id[eligible], design.src_word[eligible], strict=True))),
@@ -96,10 +96,11 @@ def summarize_replicates(records, null_records):
                 defined_null = [value for value in null if value is not None]
                 metrics[metric] = {
                     "observed_100_split": distribution(observed),
-                    "destination_permutation_25": distribution(null),
-                    "empirical_exceedance": ((1 + sum(value >= observed_median for value in defined_null))
-                                               / (len(defined_null) + 1)
-                                               if observed_median is not None and defined_null else None),
+                    "destination_destruction_25": distribution(null),
+                    "observed_median_above_all_controls": (
+                        observed_median > max(defined_null)
+                        if observed_median is not None and defined_null else None
+                    ),
                     "defined_split_replicates": sum(value is not None for value in observed),
                     "defined_null_replicates": sum(value is not None for value in null),
                 }
@@ -160,7 +161,7 @@ def main():
             fitted = [crossfit_raw_residuals(design, value, seed=args.seed, min_exposure=5,
                                              fitter=SPEC_CURVE_FITTER)[0]
                       for value in permuted]
-            null[name].append({"permutation_replicate": replicate,
+            null[name].append({"control_replicate": replicate,
                                "categories": categorized_paired_metrics(*fitted)})
 
     full_counts = np.sum(list(by_subject.values()), axis=0)
@@ -214,8 +215,8 @@ def main():
                 rows.append({"specification": specification, "category": category, "metric": metric,
                              **audit,
                              **{f"observed_{key}": value for key, value in item["observed_100_split"].items()},
-                             **{f"null_{key}": value for key, value in item["destination_permutation_25"].items()},
-                             "empirical_exceedance": item["empirical_exceedance"],
+                              **{f"control_{key}": value for key, value in item["destination_destruction_25"].items()},
+                              "observed_median_above_all_controls": item["observed_median_above_all_controls"],
                              "defined_split_replicates": item["defined_split_replicates"],
                              "defined_null_replicates": item["defined_null_replicates"]})
     csv_path = Path(args.csv_output); csv_path.parent.mkdir(parents=True, exist_ok=True)

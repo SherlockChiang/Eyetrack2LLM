@@ -51,7 +51,7 @@ def crossfit(design, counts, seed, min_exposure):
             probability = model.predict(target)
             residual, exposure = residual_vector(values, probability, target.group_start)
             residuals[text] = {"residual": residual, "exposure": exposure,
-                               "reliable": exposure >= min_exposure,
+                               "reliable": (exposure >= min_exposure) & np.isfinite(residual),
                                "src": target.src_word, "dst": target.dst_word}
             nll -= float(values @ np.log(np.maximum(probability, 1e-300)))
             observations += float(values.sum())

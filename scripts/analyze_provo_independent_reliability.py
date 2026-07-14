@@ -83,7 +83,8 @@ def main():
                 mask = design.text_id == text; target = design.subset(mask); probability = model.predict(target)
                 for index in range(2):
                     residual, exposure = residual_vector(counts[index][mask], probability, target.group_start)
-                    shared[index][text] = {"residual": residual, "exposure": exposure, "reliable": exposure >= 5,
+                    shared[index][text] = {"residual": residual, "exposure": exposure,
+                                           "reliable": (exposure >= 5) & np.isfinite(residual),
                                            "src": target.src_word, "dst": target.dst_word}
         repeats.append({"repeat": repeat, "halves": halves,
                         "independent": paired_residual_metrics(*independent),

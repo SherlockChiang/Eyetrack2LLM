@@ -537,5 +537,11 @@ def residual_vector(counts: np.ndarray, probabilities: np.ndarray, group_start: 
     lengths = np.diff(group_start)
     exposure = np.repeat(np.add.reduceat(counts, group_start[:-1]), lengths)
     expected = exposure * probabilities
-    residual = (counts - expected) / np.sqrt(expected * (1.0 - probabilities) + 1e-12)
+    variance = expected * (1.0 - probabilities)
+    residual = np.divide(
+        counts - expected,
+        np.sqrt(variance),
+        out=np.full_like(expected, np.nan, dtype=float),
+        where=(np.repeat(lengths, lengths) >= 2) & (variance > 0),
+    )
     return residual, exposure

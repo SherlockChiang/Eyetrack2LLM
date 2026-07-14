@@ -74,13 +74,17 @@ def main():
     zuco_results = {}
     comparison_loto = {}
     comparison_ci_excludes = {}
+    expected_texts = None
     for index, comparison in enumerate(COMPARISONS):
         source = zuco["comparisons"][comparison]["text_equal_fisher_z"]
         per_text = source["per_text_seed_averaged_differences"]
         texts = ordered_texts(per_text)
         values = np.asarray([per_text[text] for text in texts], float)
-        if len(values) != 193:
-            raise ValueError(f"{comparison}: expected 193 texts")
+        if len(values) != source["texts_valid"]:
+            raise ValueError(f"{comparison}: per-text values differ from declared valid-text count")
+        expected_texts = len(values) if expected_texts is None else expected_texts
+        if len(values) != expected_texts:
+            raise ValueError(f"{comparison}: valid-text support differs across comparisons")
         full = float(values.mean())
         if not np.isclose(full, source["mean_difference"], rtol=0, atol=1e-15):
             raise ValueError(f"{comparison}: mean does not reproduce transfer artifact")
@@ -122,13 +126,13 @@ def main():
         "sources": {"provo": args.provo, "zuco": args.zuco},
         "definitions": {"selection_rule": "All texts are deleted one at a time; no exclusion, refit, or result-dependent selection.",
             "provo_unit": "text (55); within each frozen subject split take the median over retained texts, then the median over 100 splits",
-            "zuco_unit": "text (193 valid paired texts); analytic delete-one mean of frozen per-text seed-averaged Fisher-z differences",
+            "zuco_unit": f"text ({expected_texts} valid paired texts); analytic delete-one mean of frozen per-text seed-averaged Fisher-z differences",
             "influential_rule": "text with largest absolute LOTO-minus-full change; numeric text order breaks exact ties",
             "provo_threshold": "zero reliability", "zuco_threshold": "zero paired difference",
             "zuco_uncertainty": "delete-one jackknife SE/normal interval plus deterministic descriptive text resampling for every retained set; no sign-flip p values",
             "joint_transfer_rule": "all three contrasts positive and each LOTO bootstrap 95% CI excludes zero"},
         "provo_reliability": {"texts": 55, "repeats": 100, "specifications": provo_results},
-        "zuco_transfer": {"texts": 193, "comparisons": zuco_results,
+        "zuco_transfer": {"texts": expected_texts, "comparisons": zuco_results,
             "joint_transfer": {"full_supported": full_joint, "supported_by_left_out_text": joint_by_text,
                                "any_deletion_changes_decision": any(value != full_joint for value in joint_by_text.values())}}}
     output_path = Path(args.output); output_path.parent.mkdir(parents=True, exist_ok=True)
