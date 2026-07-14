@@ -33,7 +33,7 @@ python scripts/run_zuco_transfer.py --help
 python scripts/audit_zuco_criterion_uncertainty.py --help
 ```
 
-Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). The source repository includes the manuscript-asset generator, scientific verifier, and exact-member compact-archive builder. Releases through `v0.1.2` are historical; this scientific revision is `v0.2.0`, and its prepared aggregate attachment has no matching permanent DOI yet.
+Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). The source repository includes the manuscript-asset generator, scientific verifier, and exact-member compact-archive builder. Releases through `v0.2.0` are historical; the matching `v0.2.1` source and reproducibility artifacts are archived at [Zenodo](https://doi.org/10.5281/zenodo.21348613).
 
 ## Citation And License
 
