@@ -9,6 +9,10 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.skipif(
+    not (ROOT / "data" / "processed" / "residual_recovery_simulation.json").is_file(),
+    reason="requires the versioned compact aggregate-results attachment",
+)
 SPEC = importlib.util.spec_from_file_location("manuscript_assets", ROOT / "scripts" / "generate_manuscript_assets.py")
 assets = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
