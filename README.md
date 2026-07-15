@@ -1,6 +1,6 @@
 # Eyetrack2LLM
 
-Eyetrack2LLM evaluates whether cross-fitted gaze-transition residual relations show fixed-split alignment and transport as candidate supervision for language models. The observational endpoint is destination allocation conditional on a retained transition already being forward, within-sentence, and within-line. It is not an intended saccade target, a first-pass-only measure, an unconditional next-fixation model, semantic distance, or causal effect; it can include rereading or regression-after-forward contexts.
+Eyetrack2LLM evaluates fixed-sample agreement of cross-fitted gaze-transition residual patterns, fixed-split alignment with a constructed residual target, and cross-corpus scorer performance against a corpus-locally recalibrated criterion. The observational endpoint is destination allocation conditional on a retained transition already being forward, within-sentence, and within-line. It is not an intended saccade target, a first-pass-only measure, an unconditional next-fixation model, semantic distance, or causal effect; it can include rereading or regression-after-forward contexts.
 
 ## Install
 
@@ -31,9 +31,10 @@ python scripts/analyze_provo_text_inference.py --help
 python scripts/convert_zuco.py --help
 python scripts/run_zuco_transfer.py --help
 python scripts/audit_zuco_criterion_uncertainty.py --help
+python scripts/audit_line_partition_identity.py --help
 ```
 
-Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). Release `v0.3.0` is archived under version DOI [10.5281/zenodo.21353010](https://doi.org/10.5281/zenodo.21353010), within concept DOI [10.5281/zenodo.21322671](https://doi.org/10.5281/zenodo.21322671). Zenodo preserves the immutable tagged source archive; the matching [GitHub release](https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.3.0) additionally provides the verified aggregate-result bundle, arXiv source, compiled PDF/log, and exact-member manifests.
+Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). Release [`v0.3.1`](https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.3.1) adds the hash-verified cross-participant line-partition audit and the final bounded reporting corrections. Zenodo concept DOI [10.5281/zenodo.21322671](https://doi.org/10.5281/zenodo.21322671) identifies all archived versions; the new version-specific DOI is added here after Zenodo processes the immutable GitHub release. Release attachments provide the verified aggregate-result bundle, arXiv source, compiled PDF/log, and exact-member manifests without participant-level data, checkpoints, or caches.
 
 ## Citation And License
 
