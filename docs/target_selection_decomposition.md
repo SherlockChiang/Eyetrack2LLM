@@ -4,7 +4,7 @@
 
 This analysis is `complete`, `post_hoc`, `secondary`, and `theory_guided`. Its categories and rules were frozen before inspecting its own diagnostic outcomes, but it was not prespecified. It does not modify or replace the frozen primary strict-line pipeline and was not used to select a new primary specification. The candidate universe remains forward, same-sentence, same-line destinations.
 
-The categories describe **token separation** `d = destination token index - source token index`: adjacent `d=1`, near skip `d=2-3`, and far same-line `d>=4`. They are not visual angle or true saccade amplitude.
+The categories describe **token separation** `d = destination token index - source token index`: adjacent `d=1`, near nonadjacent `d=2-3`, and far same-line `d>=4`. The artifact key `near_skip` is retained only as a historical machine field. A near-nonadjacent event is not evidence of first-pass word skipping because intervening words may have been fixated earlier; the categories are also not visual angle, true saccade amplitude, or target intention.
 
 ## Results
 
@@ -27,7 +27,7 @@ All defined edge-weighted and source-equal observed medians exceed all 25 destin
 
 ## Interpretation
 
-The position-only reliability is concentrated in adjacent and near-skip transitions and is weak among far same-line candidates. It is not explained solely by an adjacent-versus-all-skips category contrast because near-skip reliability remains high after conditioning on that category. The pattern is compatible with stable progressive target selection and skip-like structure across readers. It does not confirm parafoveal processing, semantic integration, or any specific cognitive mechanism.
+The position-only pattern agreement is concentrated in adjacent and near-nonadjacent transitions and is weak among far same-line candidates. It is not explained solely by an adjacent-versus-nonadjacent category contrast because near-nonadjacent agreement remains high after conditioning on that category. This describes stable destination-separation structure across the fixed reader sample. It does not confirm first-pass skipping, parafoveal processing, semantic integration, target selection, or any specific cognitive mechanism.
 
 No category-level significance comparison is made from edges; text is the descriptive/inferential aggregation layer. Full-sample residual variance/quantiles and all six specification-pair identities within category are in `data/processed/provo_target_selection_decomposition.json`. Frozen Provo auxiliary JSONs and ZuCo transfer artifacts do not retain identifiable per-edge test predictions needed for category stratification, so neither model was approximated or retrained.
 

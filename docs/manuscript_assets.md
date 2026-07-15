@@ -18,7 +18,7 @@ Set `SOURCE_DATE_EPOCH` or pass `--timestamp` to make the informational provenan
 - Figure 1 explicitly marks external human construct validation as future and not run. It does not imply a completed human experiment.
 - Figure 2 uses frozen cell means and 2.5th/97.5th replicate quantiles. Overdispersion is encoded by line style.
 - Figure 3 plots all 100 observed split summaries with two-half-average NLL and uses violins/ranges for 500 one-split destination-label destruction controls balanced across the split bank. These are descriptive controls, not calibrated permutation inference.
-- Figure 4 gives five separate Provo optimization-seed points, the three primary ZuCo text-level contrasts with descriptive text-resampling and reader-refit sensitivity intervals, and a compact panel of observable differences in cross-corpus measurement conditions.
+- Figure 4 gives five separate Provo optimization-seed points, the three primary fixed-12-reader ZuCo text-level contrasts with descriptive text reaggregation, support-varying reader-refit diagnostic ranges with no coverage or crossing-zero decision interpretation, and a compact panel of observable differences in cross-corpus measurement conditions.
 
 ## Provenance
 

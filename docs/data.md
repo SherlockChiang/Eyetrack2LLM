@@ -36,6 +36,8 @@ line_id
 | Predictability norms | <https://osf.io/download/e4a2m/> | `965fb72eab55f51e08fc1b5622638b85b1085976ff513e2a7bee4adbbd4e6489` |
 | 逐 fixation report | <https://osf.io/download/z3eh6/> | `0d961a6508ed6caafdb4bc1025c067ecc97a0be07b13d3de0acafb5ef6c4fb7e` |
 
+The two Provo inputs and all 12 ZuCo Task-2 NR MATLAB files were reacquired and hash-verified on 2026-07-15. Aggregate source identities and the completed zero-discrepancy line-partition audit are recorded in `data/processed/line_partition_identity_audit.json`; raw and participant-level files are not redistributed.
+
 逐 fixation 文件的候选字段映射：
 
 ```text

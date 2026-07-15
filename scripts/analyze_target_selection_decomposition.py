@@ -109,7 +109,7 @@ def summarize_replicates(records, null_records):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Secondary theory-guided forward target-selection decomposition")
+    parser = argparse.ArgumentParser(description="Secondary theory-guided forward destination-separation decomposition")
     parser.add_argument("--fixations", default="data/processed/provo_fixations_with_lines.csv")
     parser.add_argument("--main-csv", default="data/raw/Provo_Corpus-Eyetracking_Data.csv")
     parser.add_argument("--output", default="data/processed/provo_target_selection_decomposition.json")

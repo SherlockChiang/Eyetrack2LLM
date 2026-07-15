@@ -5,7 +5,7 @@ import torch
 from scipy.io import savemat
 
 from eyetrack2llm import extract_events, read_fixation_csv
-from eyetrack2llm.zuco import convert_zuco_mat
+from eyetrack2llm.zuco import convert_zuco_mat, validate_subject_line_partitions
 from eyetrack2llm.transfer import fit_fresh_probe, pair_sensitivity_mask, relation_scores, sentence_folds
 from eyetrack2llm.torch import LowRankDirectedHead, ResidualBottleneckAdapter
 
@@ -38,6 +38,18 @@ def test_crossfit_sentence_folds_have_no_overlap():
     folds = sentence_folds([f"NR:{i}" for i in range(20)], seed=4)
     assert all(not (set(train) & set(test)) for train, test in folds)
     assert sorted(text for _, test in folds for text in test) == sorted(f"NR:{i}" for i in range(20))
+
+
+def test_subject_line_partition_audit_allows_coordinate_but_not_line_changes():
+    words = ["a", "b", "c"]
+    reference = {"NR:1": {"words": words, "bounds": [[0, 0, 9, 9], [10, 0, 19, 9], [0, 20, 9, 29]]}}
+    shifted = {"NR:1": {"words": words, "bounds": [[1, 1, 10, 10], [11, 1, 20, 10], [1, 21, 10, 30]]}}
+    audit = validate_subject_line_partitions({"S1": reference, "S2": shifted}, ["NR:1"])
+    assert audit["line_partition_discrepancies"] == 0
+    assert audit["nonreference_word_bounds_differences"] == 3
+    changed = {"NR:1": {"words": words, "bounds": [[1, 1, 10, 10], [11, 21, 20, 30], [1, 21, 10, 30]]}}
+    with np.testing.assert_raises_regex(ValueError, "Line-partition mismatch"):
+        validate_subject_line_partitions({"S1": reference, "S2": changed}, ["NR:1"])
 
 
 def test_synthetic_transfer_recovers_known_relation():

@@ -30,6 +30,7 @@ PRIMARY = {
     "reconciliation": "provo_word_position_reconciliation.json",
     "reconciled_sensitivity": "provo_reconciled_sensitivity.json",
     "edge_threshold": "zuco_edge_threshold_sensitivity.json",
+    "line_identity": "line_partition_identity_audit.json",
     **{f"seed_{seed}": f"provo_auxiliary_strictline_fixed50_seed{seed}.json" for seed in (101, 202, 303, 404, 505)},
 }
 SUPERSEDED = {
@@ -103,7 +104,7 @@ def extract_assets(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
         functional.append({"panel": "zuco", "contrast": contrast, "mean": result["mean_difference"],
                            "fixed_ci_low": fixed[0], "fixed_ci_high": fixed[1],
                            "nested_ci_low": nested["95_ci"][0], "nested_ci_high": nested["95_ci"][1],
-                           "uncertainty": "fixed-12 descriptive text-resampling interval and reader-refit bootstrap with conditional text-reaggregation sensitivity",
+                           "uncertainty": "fixed-12 descriptive text-reaggregation interval and support-varying reader-refit diagnostic range",
                            "texts": result["texts_valid"]})
     gaze_text = data["aux_text"]["conditions"]["gaze"]
     functional.append({"panel": "provo_summary", "condition": "gaze", "macro_text_correlation": gaze_text["macro_text_equal_correlation_seed_averaged_fisher_z"],
@@ -112,7 +113,7 @@ def extract_assets(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
         {"stage": 1, "evidence": "Construct definition", "evidence_status": "Computational relation; not semantic distance"},
         {"stage": 2, "evidence": "Estimator validation", "evidence_status": sim["data_generating_process"]["counts"]},
         {"stage": 3, "evidence": "Measurement reliability", "evidence_status": "Two non-overlapping 42-reader halves per fixed-sample partition"},
-        {"stage": 4, "evidence": "Functional test", "evidence_status": "Provo auxiliary training and ZuCo transfer"},
+        {"stage": 4, "evidence": "Functional test", "evidence_status": "Provo constructed-residual alignment and ZuCo cross-corpus scorer evaluation"},
         {"stage": 5, "evidence": "External construct validation", "evidence_status": "Future human study; not completed"},
     ]
     return {"figure1": ladder, "figure2": simulation, "figure3": specification, "figure4": functional}
@@ -226,8 +227,8 @@ def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> li
     fixed_lo=np.array([r["fixed_ci_low"] for r in zuco]); fixed_hi=np.array([r["fixed_ci_high"] for r in zuco])
     nested_lo=np.array([r["nested_ci_low"] for r in zuco]); nested_hi=np.array([r["nested_ci_high"] for r in zuco])
     axes[1].errorbar(means, y-.09, xerr=[means-fixed_lo, fixed_hi-means], fmt="o", color=PALETTE["blue"], capsize=3, label="fixed 12; text resampling")
-    axes[1].errorbar(means, y+.09, xerr=[means-nested_lo, nested_hi-means], fmt="s", color=PALETTE["orange"], capsize=3, label="reader-refit sensitivity")
-    axes[1].axvline(0, color="#999999", lw=.8); axes[1].set_yticks(y, [r["contrast"].replace("gaze_vs_", "vs ") for r in zuco]); axes[1].set(xlabel="Fisher-z difference", title="ZuCo: two 95% intervals"); axes[1].legend(frameon=False, fontsize=6)
+    axes[1].errorbar(means, y+.09, xerr=[means-nested_lo, nested_hi-means], fmt="s", color=PALETTE["orange"], capsize=3, label="support-varying reader-refit diagnostic")
+    axes[1].axvline(0, color="#999999", lw=.8); axes[1].set_yticks(y, [r["contrast"].replace("gaze_vs_", "vs ") for r in zuco]); axes[1].set(xlabel="Fisher-z difference", title="ZuCo: descriptive ranges"); axes[1].legend(frameon=False, fontsize=6)
     inv = data_global["invariance"]
     vals = [inv["residual_distribution"][c]["pearson_dispersion"]["mean"] for c in ("provo", "zuco")]
     axes[2].bar(("Provo", "ZuCo"), vals, color=(PALETTE["blue"], PALETTE["orange"]), width=.6)
@@ -288,7 +289,7 @@ def make_tables(data: dict[str, Any], extracted: dict[str, list[dict[str, Any]]]
         fixed_ci = fixed[contrast]["text_equal_fisher_z"]["descriptive_text_resampling_interval"]
         ci = nested[contrast]["joint_reader_and_text"]["95_ci"]
         functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "interval_low": _fmt(fixed_ci[0]), "interval_high": _fmt(fixed_ci[1]), "interval_type": "fixed-12 descriptive text-resampling", "unit_direction": "192 structurally eligible texts; positive favors gaze"})
-        functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "interval_low": _fmt(ci[0]), "interval_high": _fmt(ci[1]), "interval_type": "reader-refit sensitivity", "unit_direction": "conditional text reaggregation; positive favors gaze"})
+        functional.append({"dataset": "ZuCo", "endpoint": contrast, "estimand": "text-equal Fisher-z difference", "estimate": _fmt(point), "secondary": "", "interval_low": _fmt(ci[0]), "interval_high": _fmt(ci[1]), "interval_type": "support-varying reader-refit diagnostic", "unit_direction": "draw-specific text support; no coverage or decision interpretation"})
     supplement = []
     for corpus in ("provo", "zuco"):
         supplement.append({"audit": "residual dispersion", "corpus_or_endpoint": corpus, "estimate": _fmt(inv["residual_distribution"][corpus]["pearson_dispersion"]["mean"]), "range_or_status": "mean"})
@@ -315,12 +316,21 @@ def make_tables(data: dict[str, Any], extracted: dict[str, list[dict[str, Any]]]
                                    "estimate": _fmt(row["mean_difference"], 5),
                                    "interval_low": _fmt(row["descriptive_text_resampling_interval"][0], 5),
                                    "interval_high": _fmt(row["descriptive_text_resampling_interval"][1], 5),
-                                    "all_three_descriptive_intervals_above_zero": block["joint_all_gaze_contrasts_positive_and_separated"],
-                                   "max_abs_correlation": _fmt(row["max_absolute_raw_correlation"], 5),
+                                    "max_abs_correlation": _fmt(row["max_absolute_raw_correlation"], 5),
                                    "near_perfect_count": row["near_perfect_raw_correlation_count"],
-                                   "max_text_mean_contribution": _fmt(row["max_absolute_text_mean_contribution"], 6)})
+                                    "max_text_mean_contribution": _fmt(row["max_absolute_text_mean_contribution"], 6)})
+    line_identity = []
+    for corpus in ("provo", "zuco"):
+        row = data["line_identity"][corpus]
+        line_identity.append({
+            "corpus": corpus.title(), "subjects": 84 if corpus == "provo" else row["subjects"], "texts": row["texts"],
+            "words": row["mapped_words"] if corpus == "provo" else row["reference_words"],
+            "bounds_differences": row["distinct_bounds_variants"] - row["mapped_words"] if corpus == "provo" else row["nonreference_word_bounds_differences"],
+            "line_partition_discrepancies": row["line_partition_discrepancies"],
+            "note": f"{row['ambiguous_words']} ambiguous word excluded before analysis" if corpus == "provo" else "all nonreference bounds exactly matched",
+        })
     made = []
-    for stem, title, rows in (("table1_corpus_pipeline_audit", "Table 1. Corpus and pipeline audit", audit), ("table2_simulation_endpoints", "Table 2. Simulation endpoints", sim), ("table3_specification_results", "Table 3. Specification results", spec_rows), ("table4_functional_transfer", "Table 4. Functional and transfer results", functional), ("table_s1_invariance_loto", "Table S1. Observable measurement-condition differences and LOTO audit", supplement), ("table_s2_target_decomposition", "Table S2. Conditional forward fixation-destination decomposition audit", target), ("table_s3_criterion_uncertainty", "Table S3. ZuCo criterion uncertainty", criterion), ("table_s4_residual_diagnostics", "Table S4. Residual and exposure diagnostics", residual), ("table_s5_provo_reconciliation", "Table S5. Provo word-position reconciliation", reconciliation), ("table_s6_zuco_edge_threshold_sensitivity", "Table S6. ZuCo edge-threshold sensitivity", edge_threshold)):
+    for stem, title, rows in (("table1_corpus_pipeline_audit", "Table 1. Corpus and pipeline audit", audit), ("table2_simulation_endpoints", "Table 2. Simulation endpoints", sim), ("table3_specification_results", "Table 3. Specification results", spec_rows), ("table4_functional_transfer", "Table 4. Constructed-residual alignment and cross-corpus scorer evaluation", functional), ("table_s1_invariance_loto", "Table S1. Observable measurement-condition differences and LOTO audit", supplement), ("table_s2_target_decomposition", "Table S2. Conditional forward fixation-destination decomposition audit", target), ("table_s3_criterion_uncertainty", "Table S3. ZuCo criterion uncertainty", criterion), ("table_s4_residual_diagnostics", "Table S4. Residual and exposure diagnostics", residual), ("table_s5_provo_reconciliation", "Table S5. Provo word-position reconciliation", reconciliation), ("table_s6_zuco_edge_threshold_sensitivity", "Table S6. ZuCo edge-threshold sensitivity", edge_threshold), ("table_s7_line_partition_identity", "Table S7. Cross-participant line-partition identity audit", line_identity)):
         rows = [{key: ("undefined (no eligible support)" if value is None else value) for key, value in row.items()} for row in rows]
         made += _write_table(output / stem, title, rows)
     threshold_source = output.parent / "source_data" / "zuco_edge_threshold_sensitivity_source_data.csv"
@@ -366,7 +376,7 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
             shutil.copyfile(path, arxiv_figures / path.name)
     table_outputs = make_tables(data, extracted, tables)
     captions = manuscript / "figure_captions.md"
-    captions.write_text("""# Figure Captions\n\n**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.\n\n**Figure 2. The simulation reliability paradox.** Mean correlation/alignment with the generating latent feature z and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under delta=0, omitted nuisance structure can yield high reliability while alignment with z is spurious. The conditional multinomial variance remains misspecified under Dirichlet overdispersion.\n\n**Figure 3. Bounded four-model nuisance-specification comparison and descriptive negative control.** Held-out predictive NLL is the average of the two half-specific event-weighted totals in each of 100 randomized partitions of the fixed 84-reader sample; reliability is a text-median edge-pattern correlation. Gray violins summarize 500 destination-label destruction controls, each computed from one split balanced across the 100-split bank. The control preserves source exposure and eligibility masks but is not a calibrated permutation test; no p value or familywise inference is reported.\n\n**Figure 4. Functional and transfer evidence.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five run seeds on one fixed 10-text split. For gaze, MLM, and position the seeds perturb optimization; for shuffle they also select different within-source label permutations, so they are not independent replicates. The horizontal line is the fixed-split, equal-text, equal-seed back-transformed mean Fisher-z correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader descriptive text-resampling interval and squares show reader-refit sensitivity with draw-specific eligible-text support and conditional text reaggregation; positive values favor gaze.\n""", encoding="utf-8")
+    captions.write_text("""# Figure Captions\n\n**Figure 1. Evidence ladder and study design.** The manuscript evaluates a computational gaze-transition residual relation through estimator validation, reliability, and functional tests. External human construct validation is explicitly future work and is not represented as completed.\n\n**Figure 2. The simulation reliability paradox.** Mean correlation/alignment with the generating latent feature z and split-half residual reliability across 80 replicates per cell; error bars are the 2.5th and 97.5th percentiles. Line type distinguishes Dirichlet-multinomial overdispersion. Under delta=0, omitted nuisance structure can yield high reliability while alignment with z is spurious. The conditional multinomial variance remains misspecified under Dirichlet overdispersion.\n\n**Figure 3. Bounded four-model nuisance-specification comparison and descriptive negative control.** Held-out predictive NLL is the average of the two half-specific event-weighted totals in each of 100 randomized partitions of the fixed 84-reader sample; reliability is a text-median edge-pattern correlation. Gray violins summarize 500 destination-label destruction controls, each computed from one split balanced across the 100-split bank. The control preserves source exposure and eligibility masks but is not a calibrated permutation test; no p value or familywise inference is reported.\n\n**Figure 4. Constructed-residual alignment and cross-corpus scorer evaluation.** Provo points show gaze-minus-MLM NLL (negative favors gaze because lower NLL is better) and pooled residual correlation for five run seeds on one fixed 10-text split. For gaze, MLM, and position the seeds perturb optimization; for shuffle they also select different within-source label permutations, so they are not independent replicates. The horizontal line is the fixed-split, equal-text, equal-seed back-transformed mean Fisher-z correlation. For each ZuCo text-equal Fisher-z gaze-minus-control contrast, circles show the fixed-12-reader descriptive text-resampling interval and squares show reader-refit sensitivity with draw-specific eligible-text support and conditional text reaggregation; positive values favor gaze.\n""", encoding="utf-8")
     captions.write_text(captions.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     caption_text = captions.read_text(encoding="utf-8")
     caption_text = caption_text.replace(
@@ -376,8 +386,11 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
         "on one fixed 10-text split.",
         "on one fixed seeded 10-text split.",
     ).replace(
+        "the fixed-12-reader descriptive text-resampling interval and squares show reader-refit sensitivity with draw-specific eligible-text support and conditional text reaggregation",
+        "the fixed-12-reader descriptive text-reaggregation interval and squares show a support-varying reader-refit diagnostic range with draw-specific eligible-text support; the latter has no fixed-population coverage or crossing-zero decision interpretation",
+    ).replace(
         "the fixed-12-reader percentile text-bootstrap 95% interval and squares show the mixture percentile interval from 200 outer reader-bootstrap criterion refits and 200 conditional text reaggregations per reader draw",
-        "the fixed-12-reader descriptive text-resampling interval and squares show the reader-refit bootstrap with conditional text-reaggregation sensitivity interval from 200 outer reader refits and 200 conditional reaggregations per reader draw",
+        "the fixed-12-reader descriptive text-reaggregation interval and squares show the support-varying diagnostic range from 200 outer reader refits and 200 conditional reaggregations per reader draw; the latter has no fixed-population coverage or crossing-zero decision interpretation",
     )
     captions.write_text(caption_text, encoding="utf-8", newline="\n")
     all_outputs = source_outputs + figure_outputs + table_outputs + [captions]
@@ -385,7 +398,7 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
     generated_at = timestamp or os.environ.get("SOURCE_DATE_EPOCH")
     if generated_at and generated_at.isdigit(): generated_at = datetime.fromtimestamp(int(generated_at), timezone.utc).isoformat()
     generated_at = generated_at or datetime.now(timezone.utc).isoformat()
-    secondary = {"half_audit", "target_decomposition", "residual_diagnostics", "aux_text", "aux_budget", "criterion", "invariance", "influence", "reconciliation", "reconciled_sensitivity", "edge_threshold"}
+    secondary = {"half_audit", "target_decomposition", "residual_diagnostics", "aux_text", "aux_budget", "criterion", "invariance", "influence", "reconciliation", "reconciled_sensitivity", "edge_threshold", "line_identity"}
     input_records = [{"path": path.relative_to(root).as_posix(), "sha256": sha256(path), "status": "complete" if key != "conversion" else "audit_complete", "role": "secondary" if key in secondary else "primary", "kind": "compact_artifact"} for key, path in paths.items()]
     input_records += [{"path": path.relative_to(root).as_posix(), "sha256": sha256(path), "status": "generated", "role": "secondary", "kind": "manuscript_asset"} for path in all_outputs]
     manifest = manuscript / "artifact_manifest.csv"; _write_csv(manifest, input_records); all_outputs.append(manifest)
@@ -402,7 +415,8 @@ def generate(root: Path = ROOT, *, timestamp: str | None = None) -> dict[str, An
         "table_s3": (["criterion"], ["/reliability/summary"]),
         "table_s4": (["residual_diagnostics"], ["/reliability_summary"]),
         "table_s5": (["reconciliation", "reconciled_sensitivity"], ["/by_text", "/summary", "/processed_observed_verified_positions", "/excluded_fixation_rows", "/excluded_forward_event_weight"]),
-        "table_s6": (["edge_threshold"], ["/results/*/comparisons/*", "/results/*/joint_all_gaze_contrasts_positive_and_separated"]),
+        "table_s6": (["edge_threshold"], ["/results/*/comparisons/*"]),
+        "table_s7": (["line_identity"], ["/provo", "/zuco", "/inputs"]),
     }
     assets = []
     for asset, (keys, fields) in groups.items():

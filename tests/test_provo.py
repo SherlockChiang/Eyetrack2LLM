@@ -1,7 +1,7 @@
 import csv
 import json
 
-from eyetrack2llm.provo import cluster_vertical_intervals, convert_provo_fixations
+from eyetrack2llm.provo import build_provo_line_map, cluster_vertical_intervals, convert_provo_fixations
 
 
 def _write(path, fieldnames, rows):
@@ -76,3 +76,25 @@ def test_ambiguous_bounds_exclude_fixations(tmp_path):
     report = convert_provo_fixations(main, fixations, output)
     assert report.written_rows == 0
     assert report.excluded_missing_line == 1
+
+
+def test_majority_bounds_cannot_hide_a_different_line_partition(tmp_path):
+    main = tmp_path / "main.csv"
+    fields = ["RECORDING_SESSION_LABEL", "Participant_ID", "TRIAL_INDEX", "Text_ID", "IA_ID", "Word_Number", "IA_TOP", "IA_BOTTOM"]
+    _write(main, fields, [
+        dict(zip(fields, ["r1", "s1", "1", "1", "1", "1", "0", "10"])),
+        dict(zip(fields, ["r2", "s2", "1", "1", "1", "1", "0", "10"])),
+        dict(zip(fields, ["r3", "s3", "1", "1", "1", "1", "20", "30"])),
+        dict(zip(fields, ["r1", "s1", "1", "1", "2", "2", "0", "10"])),
+        dict(zip(fields, ["r2", "s2", "1", "1", "2", "2", "0", "10"])),
+        dict(zip(fields, ["r3", "s3", "1", "1", "2", "2", "0", "10"])),
+        dict(zip(fields, ["r1", "s1", "1", "1", "3", "3", "20", "30"])),
+        dict(zip(fields, ["r2", "s2", "1", "1", "3", "3", "20", "30"])),
+        dict(zip(fields, ["r3", "s3", "1", "1", "3", "3", "20", "30"])),
+    ])
+    try:
+        build_provo_line_map(main)
+    except ValueError as error:
+        assert "line-partition variant mismatch" in str(error)
+    else:
+        raise AssertionError("minority cross-line AOI variant was not rejected")

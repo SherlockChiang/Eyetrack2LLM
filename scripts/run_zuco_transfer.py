@@ -19,6 +19,7 @@ from eyetrack2llm.baseline import WordMetadata, build_pair_design, count_vector,
 from eyetrack2llm.torch import LowRankDirectedHead, ResidualBottleneckAdapter, word_pool
 from eyetrack2llm.transfer import crossfit_residual_targets, relation_scores
 from eyetrack2llm.provo import cluster_vertical_intervals
+from eyetrack2llm.zuco import validate_subject_line_partitions
 
 
 SUBJECTS = ("ZAB", "ZDM", "ZDN", "ZGW", "ZJM", "ZJN", "ZJS", "ZKB", "ZKH", "ZKW", "ZMG", "ZPH")
@@ -151,14 +152,16 @@ def main():
     parser.add_argument("--cache", default="data/processed/zuco_transfer_bert.pt")
     parser.add_argument("--output", required=True)
     args = parser.parse_args(); processed = Path("data/processed")
-    metadata_rows, fixation_items = {}, []
+    metadata_rows, fixation_items, subject_metadata = {}, [], {}
     for subject in SUBJECTS:
         stem = f"zuco_{subject.lower()}_nr"
         rows = json.loads((processed / f"{stem}_words.json").read_text(encoding="utf-8")); by_id = {row["text_id"]: row for row in rows}
+        subject_metadata[subject] = by_id
         if not all(text in by_id for text in TEXTS): raise ValueError(f"{subject} lacks a common target text")
         if not metadata_rows: metadata_rows = {text: by_id[text] for text in TEXTS}
         elif any(by_id[text]["words"] != metadata_rows[text]["words"] for text in TEXTS): raise ValueError(f"Metadata mismatch for {subject}")
         fixation_items.append(read_fixation_csv(processed / f"{stem}_fixations.csv"))
+    line_partition_audit = validate_subject_line_partitions(subject_metadata, TEXTS)
     fixations = Fixations(*[
         np.concatenate([getattr(item, field) for item in fixation_items])
         for field in ("subject_id", "text_id", "word_index", "fixation_order", "duration_ms", "line_id")
@@ -206,14 +209,15 @@ def main():
               "candidate_pairs": len(design.features), "source_groups": len(design.group_start) - 1,
                "target_residual": "unclipped raw cross-fitted Pearson residual",
                "residual_support_policy": RESIDUAL_SUPPORT_POLICY, "scaling": scaling},
-              "audit": {"bert_word_alignment": float(np.mean([item["aligned"] for item in cache["texts"].values()])),
+              "audit": {"line_partition_identity": line_partition_audit,
+                         "bert_word_alignment": float(np.mean([item["aligned"] for item in cache["texts"].values()])),
                         "bert_hidden_layer": cache["hidden_layer"], "max_bert_tokens": max(item["tokens"] for item in cache["texts"].values()),
                         "syntax": {key: value for key, value in syntax_audit.items() if key != "sentence_reports"}},
               "checkpoint_metadata": checkpoint_metadata, "seed_results": results, "unadapted_bert_cosine": cosine,
                "comparisons": {"gaze_vs_mlm": paired_summary(results, "gaze", "mlm"),
                               "gaze_vs_shuffled": paired_summary(results, "gaze", "shuffled", SEED + 1),
                               "gaze_vs_position": paired_summary(results, "gaze", "position", SEED + 2)},
-              "interpretation_rule": "If real gaze does not exceed both controls, the Provo relation did not transfer. Superiority would indicate relation transfer, not improved MLM efficiency."}
+               "interpretation_rule": "Fixed-reader contrasts describe cross-corpus scorer evaluation against a corpus-locally recalibrated constructed-residual criterion; they do not define population transport success or gaze-specific information beyond residual geometry."}
     path = Path(args.output); path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(output, indent=2, allow_nan=False), encoding="utf-8")
     print(json.dumps({"seed_overall": {seed: {condition: value["overall_correlation"] for condition, value in conditions.items()} for seed, conditions in results.items()},
                       "cosine": cosine["overall_correlation"], "comparisons": output["comparisons"]}, indent=2))

@@ -109,9 +109,20 @@ def verify_arxiv_artifacts(*, require_bundle: bool = False) -> None:
     table_s4 = (arxiv / "tables/table_s4_residual_diagnostics.tex").read_text(encoding="utf-8")
     require("0.5507 (0.5442, 0.5561)" in table_s4 and "0.8057" in table_s4 and "0.7983" in table_s4, "arXiv Table S4 is not generated from current residual diagnostics")
     table_s6 = (arxiv / "tables/table_s6_zuco_edge_threshold_sensitivity.tex").read_text(encoding="utf-8")
-    require(len(re.findall(r"(?m)^4 .* & no \\\\$", table_s6)) == 3, "Table S6 primary threshold joint status is incorrect")
-    require(all(len(re.findall(rf"(?m)^{threshold} .* & yes \\\\$", table_s6)) == 3 for threshold in (10, 20, 30)), "Table S6 higher-threshold joint statuses are incorrect")
+    require("Threshold-level joint criterion" not in table_s6 and not re.search(r"(?m)^\d+ .* & (?:yes|no) \\\\$", table_s6), "Table S6 contains a post hoc joint decision rule")
+    require("Range low & Range high" in table_s6, "Table S6 descriptive range header is missing")
     require("At no threshold" not in table_s6, "Table S6 contains a conclusion contradicted by its cells")
+    table_s7 = (arxiv / "tables/table_s7_line_partition_identity.tex").read_text(encoding="utf-8")
+    require("Provo & 84 & 55 & 2739 & 0" in table_s7 and "ZuCo & 12 & 200 & 4423 & 0" in table_s7, "Table S7 does not report the completed line-partition audit")
+    require(".765/.897" in main and ".765/.784" not in main, "position-only raw-deviation agreement is stale or incorrect")
+    require("2.977 under half-specific fitting and 2.544" in main, "flexible variance summary is not tied to variance_summary medians")
+    require(not re.search(r"near[- ]skip|skip-like|skipped material", main, re.I), "arXiv manuscript overinterprets nonadjacent transitions as word skipping")
+    require("support-varying reader-refit diagnostic" in main and "no crossing-zero decision role" in table4, "ZuCo reader-refit diagnostic is assigned an inferential role")
+    require("Failure to exceed controls in ZuCo" not in main and "Secondary theory-guided target decomposition" not in main, "arXiv manuscript contains superseded ZuCo or target-decomposition wording")
+    figure4_svg = (ROOT / "manuscript/figures/figure4_functional_evidence.svg").read_text(encoding="utf-8")
+    require("ZuCo: descriptive ranges" in figure4_svg and "two 95% intervals" not in figure4_svg, "Figure 4 assigns inferential interval language to the ZuCo diagnostic")
+    public_influence = (ROOT / "docs/text_influence.md").read_text(encoding="utf-8")
+    require(all(value in public_influence for value in ("0.021186", "0.033270", "0.017632", "3 x 192 = 576")), "public text-influence documentation contains superseded ZuCo results")
     if not require_bundle:
         return
     manifest_path = ROOT / "dist" / "arxiv_bundle_manifest.json"
@@ -271,15 +282,15 @@ def verify_full_local_results() -> None:
     require("not a complete variance decomposition" in half_audit.get("interpretation_guardrail", ""), "half-specific audit is missing its variance-decomposition guardrail")
 
     decomposition = load("provo_target_selection_decomposition.json")
-    require(decomposition.get("analysis_role") == "secondary" and decomposition.get("selection") == "theory_guided", "target-selection decomposition must remain secondary and theory-guided")
-    require(decomposition.get("primary_pipeline") == "frozen and unchanged", "target-selection analysis must not replace the primary pipeline")
-    require(decomposition.get("risk_set") == RISK_SET, "target-selection decomposition has the wrong candidate universe")
-    require(decomposition.get("repeats") == 100 and decomposition.get("null_repeats") == 25, "target-selection repeat counts are incorrect")
+    require(decomposition.get("analysis_role") == "secondary" and decomposition.get("selection") == "theory_guided", "destination-separation decomposition must remain secondary and theory-guided")
+    require(decomposition.get("primary_pipeline") == "frozen and unchanged", "destination-separation analysis must not replace the primary pipeline")
+    require(decomposition.get("risk_set") == RISK_SET, "destination-separation decomposition has the wrong candidate universe")
+    require(decomposition.get("repeats") == 100 and decomposition.get("null_repeats") == 25, "destination-separation repeat counts are incorrect")
     categories = {"adjacent", "near_skip", "far_same_line"}
-    require(set(decomposition.get("candidate_and_observation_audit", {})) == categories, "target-selection categories are incomplete")
-    require(set(decomposition.get("summary", {})) == set(expected_ranks), "target-selection specifications are incomplete")
-    require(all(set(decomposition["summary"][name]) == categories for name in expected_ranks), "target-selection category summaries are incomplete")
-    require(all(set(decomposition["summary"][name][category]) == metrics for name in expected_ranks for category in categories), "target-selection estimands are incomplete")
+    require(set(decomposition.get("candidate_and_observation_audit", {})) == categories, "destination-separation categories are incomplete")
+    require(set(decomposition.get("summary", {})) == set(expected_ranks), "destination-separation specifications are incomplete")
+    require(all(set(decomposition["summary"][name]) == categories for name in expected_ranks), "destination-separation category summaries are incomplete")
+    require(all(set(decomposition["summary"][name][category]) == metrics for name in expected_ranks for category in categories), "destination-separation estimands are incomplete")
     require(all(decomposition["summary"][name]["adjacent"]["per_source_fisher_equal"]["defined_split_replicates"] == 0 for name in expected_ranks), "adjacent within-source correlations must remain undefined")
 
     diagnostics = load("provo_residual_exposure_diagnostics.json")
@@ -317,7 +328,8 @@ def verify_full_local_results() -> None:
     transfer_influence = influence.get("zuco_transfer", {})
     require(transfer_influence.get("texts") == 192 and set(transfer_influence.get("comparisons", {})) == required_comparisons, "influence diagnostics require three 192-text transfer comparisons")
     require(all(len(result.get("leave_one_text_out", {})) == 192 for result in transfer_influence["comparisons"].values()), "each transfer influence result requires 192 deletions")
-    require(len(transfer_influence.get("joint_transfer", {}).get("supported_by_left_out_text", {})) == 192, "joint transfer influence rule requires 192 deletions")
+    require("joint_transfer" not in transfer_influence and "joint_transfer_rule" not in influence.get("definitions", {}), "text influence artifact contains a joint transfer decision rule")
+    require(all(result["loto_range"][0] > 0 for result in transfer_influence["comparisons"].values()), "each ZuCo contrast-specific LOTO range must remain positive")
     influence_csv = PROCESSED / "text_influence_diagnostics.csv"
     require(influence_csv.is_file(), "missing text influence CSV")
     with influence_csv.open(encoding="utf-8", newline="") as handle:
@@ -326,6 +338,11 @@ def verify_full_local_results() -> None:
     require(len(influence_rows) == expected_influence_rows, "text influence CSV row count is incorrect")
 
     conversion = load("provo_conversion_strictline_report.json", require_complete=False)
+    line_identity = load("line_partition_identity_audit.json")
+    require(len(line_identity.get("inputs", [])) == 14, "line-partition audit requires 14 hash-verified official inputs")
+    require(line_identity.get("provo", {}).get("line_partition_discrepancies") == 0 and line_identity.get("provo", {}).get("bounds_variant_observations") == 230076, "Provo line-partition audit is incomplete or discrepant")
+    require(line_identity.get("zuco", {}).get("line_partition_discrepancies") == 0 and line_identity.get("zuco", {}).get("nonreference_word_bounds_differences") == 0, "ZuCo line-partition audit is incomplete or discrepant")
+    require(all(len(row.get("sha256", "")) == 64 and row.get("bytes", 0) > 0 for row in line_identity["inputs"]), "line-partition input identities require byte sizes and SHA-256 values")
     audit = load("provo_word_line_audit.json", require_complete=False)
     require(isinstance(conversion, dict) and conversion.get("written_rows", 0) > 0, "strict-line conversion report is incomplete")
     require(isinstance(audit, list) and len(audit) == conversion.get("line_mapped_words", 0) + conversion.get("line_missing_words", 0), "word-line layout audit is incomplete")

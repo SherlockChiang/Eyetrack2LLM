@@ -84,6 +84,26 @@ def build_provo_line_map(main_path, *, encoding="cp1252"):
             line_map[key] = label
     for row in audit:
         row["line_id"] = line_map.get((row["text_id"], row["word_number"]))
+    for text in sorted({key[0] for key in line_map}, key=int):
+        line_intervals: dict[int, list[tuple[float, float]]] = defaultdict(list)
+        for key, line in line_map.items():
+            if key[0] == text:
+                line_intervals[line].append(consensus[key])
+        envelopes = {
+            line: (min(interval[0] for interval in intervals), max(interval[1] for interval in intervals))
+            for line, intervals in line_intervals.items()
+        }
+        for row in (item for item in audit if item["text_id"] == text and item["status"] == "mapped"):
+            expected = row["line_id"]
+            for variant in row["bounds_counts"]:
+                top, bottom = variant["top"], variant["bottom"]
+                matches = [line for line, (low, high) in envelopes.items() if top < high and low < bottom]
+                if matches != [expected]:
+                    raise ValueError(
+                        f"Provo line-partition variant mismatch at text {text}, word {row['word_number']}: "
+                        f"bounds {(top, bottom)} match consensus lines {matches}, expected {expected}"
+                    )
+            row["all_bounds_variants_match_consensus_line"] = True
     return line_map, audit
 
 

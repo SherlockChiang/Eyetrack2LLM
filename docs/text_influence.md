@@ -31,15 +31,15 @@ There is no sign reversal or crossing of the zero-reliability threshold in any o
 
 ## ZuCo Transfer
 
-The frozen unit is each comparison's 192 `per_text_seed_averaged_differences`. Delete-one means use the analytic identity `(sum(values) - deleted) / 191`. For each deletion, the artifact records a deterministic 10,000-draw descriptive text-resampling interval using derived seeds, plus the full-sample delete-one jackknife SE and normal interval. No sign-flip p value is reported because exchangeability is not established by the observational design.
+The frozen unit is each comparison's 192 `per_text_seed_averaged_differences`. Delete-one means use the analytic identity `(sum(values) - deleted) / 191`. For each deletion, the artifact records a deterministic 10,000-draw descriptive text-reaggregation interval using derived seeds, plus the full-sample delete-one jackknife SE and descriptive normal interval. No sign-flip p value is reported because exchangeability is not established by the observational design.
 
-| Contrast | Full | LOTO range | Max abs change | Most influential | Jackknife 95% CI |
+| Contrast | Full | LOTO range | Max abs change | Most influential | Descriptive jackknife normal interval |
 |---|---:|---:|---:|---|---:|
-| gaze vs MLM | 0.012751 | 0.010766-0.017740 | 0.004988 | NR:108 | -0.008257-0.033759 |
-| gaze vs shuffled | 0.021140 | 0.019248-0.022827 | 0.001892 | NR:271 | 0.007069-0.035210 |
-| gaze vs position | 0.009089 | 0.007374-0.012093 | 0.003003 | NR:169 | -0.010476-0.028655 |
+| gaze vs MLM | 0.021186 | 0.019188-0.024051 | 0.002865 | NR:112 | 0.001900-0.040473 |
+| gaze vs shuffled | 0.033270 | 0.030874-0.035084 | 0.002396 | NR:212 | 0.016327-0.050214 |
+| gaze vs position | 0.017632 | 0.015415-0.022357 | 0.004725 | NR:112 | -0.006762-0.042025 |
 
-No contrast reverses sign. Across every deletion, the fixed-reader descriptive interval pattern also remains unchanged. The frozen descriptive joint rule requires all three contrasts to be positive with intervals above zero. It is false in the full sample and false under every one of the 192 deletions. This sensitivity does not resolve population-level reader-text uncertainty.
+No contrast reverses sign. Across every deletion, the fixed-reader descriptive interval pattern also remains unchanged. This direct reaggregation sensitivity describes the fixed 12-reader, 192-text estimand only and does not resolve population-level reader-text uncertainty.
 
 ## Limits
 

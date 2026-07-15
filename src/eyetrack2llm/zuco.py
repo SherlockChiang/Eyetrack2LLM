@@ -105,6 +105,51 @@ def map_sentence_fixations(words, bounds, x, y, durations):
     return rows, counts
 
 
+def validate_subject_line_partitions(subject_metadata: dict[str, dict[str, dict]], text_ids) -> dict:
+    """Require identical word sequences and line partitions across ZuCo subjects."""
+    text_ids = tuple(text_ids)
+    subjects = list(subject_metadata)
+    if not subjects:
+        raise ValueError("No ZuCo subject metadata supplied")
+    reference_subject = subjects[0]
+    reference = subject_metadata[reference_subject]
+    compared_words = 0
+    bounds_discrepancies = 0
+    for text_id in text_ids:
+        if text_id not in reference:
+            raise ValueError(f"{reference_subject} lacks metadata for {text_id}")
+        expected_words = reference[text_id]["words"]
+        expected_bounds = np.asarray(reference[text_id]["bounds"], dtype=float)
+        expected_lines = cluster_vertical_intervals(
+            [(float(bound[1]), float(bound[3])) for bound in expected_bounds]
+        )
+        compared_words += len(expected_words)
+        for subject in subjects[1:]:
+            row = subject_metadata[subject].get(text_id)
+            if row is None:
+                raise ValueError(f"{subject} lacks metadata for {text_id}")
+            if row["words"] != expected_words:
+                raise ValueError(f"Word sequence mismatch for {subject} at {text_id}")
+            bounds = np.asarray(row["bounds"], dtype=float)
+            if bounds.shape != expected_bounds.shape:
+                raise ValueError(f"Word-bounds shape mismatch for {subject} at {text_id}")
+            bounds_discrepancies += int(np.count_nonzero(np.any(bounds != expected_bounds, axis=1)))
+            lines = cluster_vertical_intervals(
+                [(float(bound[1]), float(bound[3])) for bound in bounds]
+            )
+            if lines != expected_lines:
+                mismatches = [index for index, (left, right) in enumerate(zip(expected_lines, lines, strict=True)) if left != right]
+                raise ValueError(f"Line-partition mismatch for {subject} at {text_id}: word indices {mismatches}")
+    return {
+        "subjects": len(subjects),
+        "texts": len(text_ids),
+        "reference_subject": reference_subject,
+        "reference_words": compared_words,
+        "nonreference_word_bounds_differences": bounds_discrepancies,
+        "line_partition_discrepancies": 0,
+    }
+
+
 def convert_zuco_mat(
     mat_path: str | PathLike[str], output_path: str | PathLike[str], *,
     report_path: str | PathLike[str] | None = None,

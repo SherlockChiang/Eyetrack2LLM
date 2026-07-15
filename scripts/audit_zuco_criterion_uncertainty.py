@@ -19,6 +19,7 @@ from eyetrack2llm.stability import (balanced_subject_subsets, crossfit_raw_resid
                                     paired_residual_metrics, weighted_correlation)
 from run_zuco_transfer import (SEED, SUBJECTS, TEXTS, TransferModel, build_metadata,
                                cache_hidden, relation_scores)
+from eyetrack2llm.zuco import validate_subject_line_partitions
 
 METRICS = ("edge_weighted", "source_equal_flatten", "per_source_fisher_equal")
 CONTRASTS = (("gaze", "mlm"), ("gaze", "shuffled"), ("gaze", "position"))
@@ -149,12 +150,15 @@ def main():
     parser.add_argument("--provo-subsets", type=int, default=200)
     parser.add_argument("--seed", type=int, default=SEED)
     args = parser.parse_args(); processed = Path("data/processed")
-    metadata_rows, event_items = {}, []
+    metadata_rows, event_items, subject_metadata = {}, [], {}
     for subject in SUBJECTS:
         stem = f"zuco_{subject.lower()}_nr"
         rows = json.loads((processed / f"{stem}_words.json").read_text(encoding="utf-8")); by_id = {x["text_id"]: x for x in rows}
+        if not all(text in by_id for text in TEXTS): raise ValueError(f"{subject} lacks a common target text")
+        subject_metadata[subject] = by_id
         if not metadata_rows: metadata_rows = {text: by_id[text] for text in TEXTS}
         event_items.append(extract_events(read_fixation_csv(processed / f"{stem}_fixations.csv"), include_self=False, require_consecutive_order=True))
+    line_partition_audit = validate_subject_line_partitions(subject_metadata, TEXTS)
     class Events: pass
     events = Events()
     for field in ("subject_id", "text_id", "src_word", "dst_word", "event_type", "weight"):
@@ -192,6 +196,7 @@ def main():
               "seed": args.seed, "design": {"subjects": 12, "texts": 200, "partitions": len(partitions), "split": "6/6",
               "risk_set": "common_forward_same_sentence_same_line", "nuisance": "half-independent corpus-local 5-fold common-core fit",
               "target": "raw unclipped Pearson residual", "full_min_exposure": 10, "half_min_exposure": 5},
+              "line_partition_identity": line_partition_audit,
               "reliability": {"summary": reliability, "partitions": partition_rows}, "noise_ceiling": ceiling,
               "frozen_model": {"checkpoint_seeds": checkpoint_seeds, "fixed12_text_conditioned": fixed12,
                                "per_condition_text_correlations": full_correlations},

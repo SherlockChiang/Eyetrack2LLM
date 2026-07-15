@@ -117,11 +117,6 @@ def main():
         comparison_loto[comparison] = loto
         comparison_ci_excludes[comparison] = ci_excludes
 
-    common = set.intersection(*(set(values) for values in comparison_loto.values()))
-    joint_by_text = {text: all(comparison_loto[name][text] > 0 and comparison_ci_excludes[name][text]
-                               for name in COMPARISONS) for text in ordered_texts(common)}
-    full_joint = all(zuco_results[name]["full"] > 0 and zuco_results[name]["full_descriptive_text_resampling_interval"][0] > 0
-                     for name in COMPARISONS)
     output = {"status": "complete", "seed": SEED, "resamples_per_zuco_loto": args.resamples,
         "sources": {"provo": args.provo, "zuco": args.zuco},
         "definitions": {"selection_rule": "All texts are deleted one at a time; no exclusion, refit, or result-dependent selection.",
@@ -129,12 +124,9 @@ def main():
             "zuco_unit": f"text ({expected_texts} valid paired texts); analytic delete-one mean of frozen per-text seed-averaged Fisher-z differences",
             "influential_rule": "text with largest absolute LOTO-minus-full change; numeric text order breaks exact ties",
             "provo_threshold": "zero reliability", "zuco_threshold": "zero paired difference",
-            "zuco_uncertainty": "delete-one jackknife SE/normal interval plus deterministic descriptive text resampling for every retained set; no sign-flip p values",
-            "joint_transfer_rule": "all three contrasts positive and each LOTO bootstrap 95% CI excludes zero"},
+            "zuco_uncertainty": "delete-one jackknife SE/normal interval plus deterministic descriptive text resampling for every retained set; no sign-flip p values or joint decision rule"},
         "provo_reliability": {"texts": 55, "repeats": 100, "specifications": provo_results},
-        "zuco_transfer": {"texts": expected_texts, "comparisons": zuco_results,
-            "joint_transfer": {"full_supported": full_joint, "supported_by_left_out_text": joint_by_text,
-                               "any_deletion_changes_decision": any(value != full_joint for value in joint_by_text.values())}}}
+        "zuco_transfer": {"texts": expected_texts, "comparisons": zuco_results}}
     output_path = Path(args.output); output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(output, indent=2, allow_nan=False), encoding="utf-8")
     csv_path = Path(args.csv_output); csv_path.parent.mkdir(parents=True, exist_ok=True)

@@ -29,6 +29,7 @@ AGGREGATE_CSV = (
     "data/processed/provo_auxiliary_strictline_budget_learning_curves.csv",
     "data/processed/zuco_strictline_criterion_uncertainty.csv",
     "data/processed/zuco_edge_threshold_sensitivity.csv",
+    "data/processed/line_partition_identity_audit.csv",
 )
 
 

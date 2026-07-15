@@ -67,7 +67,6 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
                 "descriptive_text_resampling_interval": interval,
                 "interval_source": interval_source,
                 "interval_seed": interval_seed,
-                "directionally_separated_from_zero": bool(interval[0] > 0 or interval[1] < 0),
                 "max_absolute_raw_correlation": float(np.max(np.abs(raw))),
                 "max_absolute_fisher_z": float(np.max(np.abs(np.arctanh(np.clip(raw, -1 + 1e-7, 1 - 1e-7))))),
                 "near_perfect_raw_correlation_count": int(np.count_nonzero(np.abs(raw) >= 0.99)),
@@ -78,13 +77,7 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
             rows.append({"minimum_edges": threshold, "contrast": name, **comparison,
                          "descriptive_text_resampling_interval": json.dumps(interval),
                          "available_text_strata_by_minimum_edges": json.dumps(strata, sort_keys=True)})
-        threshold_results[str(threshold)] = {
-            "comparisons": comparisons,
-            "joint_all_gaze_contrasts_positive_and_separated": all(
-                item["mean_difference"] > 0 and item["descriptive_text_resampling_interval"][0] > 0
-                for item in comparisons.values()
-            ),
-        }
+        threshold_results[str(threshold)] = {"comparisons": comparisons}
     return {
         "status": "complete",
         "analysis_role": "descriptive edge-threshold sensitivity on frozen fixed-reader transfer results",
@@ -97,7 +90,7 @@ def analyze(payload: dict, thresholds: tuple[int, ...] = (4, 10, 20, 30),
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Reaggregate frozen ZuCo transfer results across minimum-edge thresholds")
+    parser = argparse.ArgumentParser(description="Reaggregate frozen ZuCo cross-corpus scorer results across minimum-edge thresholds")
     parser.add_argument("input")
     parser.add_argument("--output", required=True)
     parser.add_argument("--csv-output", required=True)

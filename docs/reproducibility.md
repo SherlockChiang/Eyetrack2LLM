@@ -47,6 +47,7 @@ Convert all 12 official ZuCo NR files using the Bash or PowerShell loop in [zuco
 ```bash
 python scripts/run_zuco_transfer.py --checkpoint-dir data/processed/strictline_fixed50 --cache data/processed/zuco_transfer_bert.pt --output data/processed/zuco_transfer_strictline_fixed50.json
 python scripts/audit_zuco_criterion_uncertainty.py --output data/processed/zuco_strictline_criterion_uncertainty.json --csv-output data/processed/zuco_strictline_criterion_uncertainty.csv --checkpoint-dir data/processed/strictline_fixed50 --cache data/processed/zuco_transfer_bert.pt --reader-bootstraps 200 --text-bootstraps 200 --provo-subsets 200 --seed 20260711
+python scripts/audit_line_partition_identity.py
 python scripts/analyze_zuco_edge_threshold_sensitivity.py data/processed/zuco_transfer_strictline_fixed50.json --output data/processed/zuco_edge_threshold_sensitivity.json --csv-output data/processed/zuco_edge_threshold_sensitivity.csv --bootstrap 100000 --seed 20260713
 ```
 

@@ -43,6 +43,7 @@ scripts/analyze_cross_corpus_invariance.py
 scripts/analyze_text_influence.py
 scripts/analyze_provo_reconciled_sensitivity.py
 scripts/audit_provo_word_reconciliation.py
+scripts/audit_line_partition_identity.py
 scripts/summarize_provo_budget.py
 scripts/generate_manuscript_assets.py
 scripts/build_compact_artifact_bundle.py
@@ -50,7 +51,6 @@ scripts/verify_results.py
 scripts/check_release.py
 scripts/stage_public.py
 scripts/rebuild_release_assets.py
-scripts/migrate_descriptive_control_artifacts.py
 
 # Public tests
 tests/test_transitions.py

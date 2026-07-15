@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.check_release import Finding, audit_release, public_files
+from scripts.check_release import FORBIDDEN_PUBLIC_PATH, FORBIDDEN_PUBLIC_SUFFIXES, Finding, audit_release, public_files
 
 
 def _minimal_release(root: Path) -> None:
@@ -44,3 +44,10 @@ def test_audit_detects_secret(tmp_path):
 def test_current_public_release_has_no_findings():
     root = Path(__file__).resolve().parents[1]
     assert audit_release(root) == []
+
+
+def test_forbidden_public_artifacts_are_identified():
+    assert FORBIDDEN_PUBLIC_PATH.search("data/raw/resultsZAB_NR.mat")
+    assert FORBIDDEN_PUBLIC_PATH.search("data/processed/zuco_fixations.csv")
+    assert FORBIDDEN_PUBLIC_PATH.search("manuscript/manuscript.md")
+    assert ".pt" in FORBIDDEN_PUBLIC_SUFFIXES

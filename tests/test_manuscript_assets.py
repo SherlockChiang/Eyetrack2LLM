@@ -35,7 +35,7 @@ def test_expected_generated_schema_and_hashes() -> None:
     provenance = json.loads((ROOT / "manuscript" / "artifact_provenance.json").read_text(encoding="utf-8"))
     assert provenance["schema_version"] == 1
     assert provenance["superseded_inputs"] == []
-    assert {record["asset"] for record in provenance["assets"]} == {"figure1", "figure2", "figure3", "figure4", "table1", "table2", "table3", "table4", "table_s1", "table_s2", "table_s3", "table_s4", "table_s5", "table_s6"}
+    assert {record["asset"] for record in provenance["assets"]} == {"figure1", "figure2", "figure3", "figure4", "table1", "table2", "table3", "table4", "table_s1", "table_s2", "table_s3", "table_s4", "table_s5", "table_s6", "table_s7"}
     for record in provenance["assets"]:
         assert record["inputs"] and record["fields_and_transforms"] and record["outputs"]
         for output in record["outputs"]:

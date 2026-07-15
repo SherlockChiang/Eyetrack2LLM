@@ -19,6 +19,10 @@ SECRET_PATTERNS = {
     "AWS access key": re.compile(rb"AKIA[0-9A-Z]{16}"),
     "assigned secret": re.compile(rb"(?i)(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*['\"][^'\"\s]{8,}['\"]"),
 }
+FORBIDDEN_PUBLIC_PATH = re.compile(
+    r"(?:^|/)(?:data/(?:raw|processed)|dist|arxiv|manuscript|checkpoints?|caches?)(?:/|$)", re.I
+)
+FORBIDDEN_PUBLIC_SUFFIXES = {".mat", ".pt", ".npz", ".npy", ".pkl", ".pickle"}
 
 
 @dataclass(frozen=True)
@@ -54,8 +58,13 @@ def candidate_files(root: Path, mode: str = "public") -> list[Path]:
 
 
 def staged_files(root: Path) -> list[Path]:
-    result = subprocess.run(["git", "diff", "--cached", "--name-only", "-z"], cwd=root, capture_output=True, check=True)
+    result = subprocess.run(["git", "diff", "--cached", "--diff-filter=ACMR", "--name-only", "-z"], cwd=root, capture_output=True, check=True)
     return [root / name.decode() for name in result.stdout.split(b"\0") if name]
+
+
+def tracked_files(root: Path) -> list[Path]:
+    result = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True)
+    return [root / name.decode() for name in result.stdout.split(b"\0") if name and (root / name.decode()).is_file()]
 
 
 def _python_import_findings(root: Path, files: list[Path]) -> list[Finding]:
@@ -124,11 +133,20 @@ def audit_release(root: Path, mode: str = "public") -> list[Finding]:
             if path.resolve() not in public:
                 findings.append(Finding("ERROR", path.relative_to(root).as_posix(), "staged file is not public"))
     names = {path.relative_to(root).as_posix() for path in files}
+    if mode == "public" and (root / ".git").exists():
+        try:
+            tracked = {path.relative_to(root).as_posix() for path in tracked_files(root)}
+        except subprocess.CalledProcessError as error:
+            return [Finding("ERROR", "git index", str(error))]
+        for name in sorted(tracked - names):
+            findings.append(Finding("ERROR", name, "tracked file is not declared public; a GitHub source archive would include it"))
     for name in REQUIRED_FILES:
         if name not in names:
             findings.append(Finding("ERROR", name, "required release file is missing"))
     for path in files:
         relative = path.relative_to(root).as_posix()
+        if FORBIDDEN_PUBLIC_PATH.search(relative) or path.suffix.lower() in FORBIDDEN_PUBLIC_SUFFIXES:
+            findings.append(Finding("ERROR", relative, "participant data, generated artifacts, model state, or workspace output cannot be public source"))
         if not path.is_file():
             findings.append(Finding("ERROR", relative, "public file is missing"))
             continue
