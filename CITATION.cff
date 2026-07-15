@@ -4,16 +4,19 @@ title: "Eyetrack2LLM"
 version: "0.3.1"
 date-released: "2026-07-15"
 license: MIT
-doi: "10.5281/zenodo.21322671"
+doi: "10.5281/zenodo.21367785"
 repository-code: "https://github.com/SherlockChiang/Eyetrack2LLM"
 url: "https://github.com/SherlockChiang/Eyetrack2LLM"
 identifiers:
+  - type: doi
+    value: "10.5281/zenodo.21367785"
+    description: "Version-specific immutable source archive for v0.3.1"
   - type: doi
     value: "10.5281/zenodo.21322671"
     description: "Concept DOI for all archived versions"
   - type: url
     value: "https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.3.1"
-    description: "GitHub source and reproducibility artifact release; version DOI is backfilled after Zenodo publication"
+    description: "Matching GitHub source and reproducibility artifact release"
 authors:
   - family-names: "Jiang"
     given-names: "Yuhan"
