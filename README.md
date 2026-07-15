@@ -34,7 +34,7 @@ python scripts/audit_zuco_criterion_uncertainty.py --help
 python scripts/audit_line_partition_identity.py --help
 ```
 
-Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). Release [`v0.3.1`](https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.3.1) adds the hash-verified cross-participant line-partition audit and the final bounded reporting corrections. Its immutable source archive is [10.5281/zenodo.21367785](https://doi.org/10.5281/zenodo.21367785), under concept DOI [10.5281/zenodo.21322671](https://doi.org/10.5281/zenodo.21322671). Release attachments provide the verified aggregate-result bundle, arXiv source, compiled PDF/log, and exact-member manifests without participant-level data, checkpoints, or caches.
+Methods and scope are summarized in [methods.md](docs/methods.md) and [limitations.md](docs/limitations.md). Release [`v0.3.2`](https://github.com/SherlockChiang/Eyetrack2LLM/releases/tag/v0.3.2) standardizes publication figure typography and layout, removes plot-area label collisions, and preserves the complete appendix simulation grid. Zenodo concept DOI [10.5281/zenodo.21322671](https://doi.org/10.5281/zenodo.21322671) identifies all archived versions; the new version-specific DOI is added here after Zenodo processes the immutable GitHub release. Release attachments provide the verified aggregate-result bundle, arXiv source, compiled PDF/log, and exact-member manifests without participant-level data, checkpoints, or caches.
 
 ## Citation And License
 

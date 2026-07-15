@@ -44,7 +44,7 @@ SUPERSEDED = {
 SPEC_ORDER = ("position_only", "lexical", "syntax", "flexible")
 METHOD_ORDER = ("correct", "misspecified", "raw")
 METHOD_LABELS = {"correct": "generating-nuisance-complete", "misspecified": "x2-omitting mean model", "raw": "unadjusted counts/deviation"}
-PALETTE = {"blue": "#0072B2", "orange": "#E69F00", "green": "#009E73", "red": "#D55E00", "purple": "#CC79A7", "gray": "#666666"}
+PALETTE = {"blue": "#2F5D7E", "orange": "#C47F3A", "green": "#4F7C6B", "red": "#A34F46", "purple": "#7A668C", "gray": "#6B7075"}
 
 
 def sha256(path: Path) -> str:
@@ -139,9 +139,15 @@ def _write_table(base: Path, title: str, rows: list[dict[str, Any]]) -> list[Pat
 
 
 def _style(plt: Any) -> None:
-    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 8, "axes.titlesize": 9, "axes.labelsize": 8,
-                         "xtick.labelsize": 7, "ytick.labelsize": 7, "axes.spines.top": False,
-                         "axes.spines.right": False, "svg.fonttype": "none", "pdf.fonttype": 42})
+    plt.rcParams.update({
+        "font.family": "serif", "font.serif": ["DejaVu Serif"], "font.size": 8.5,
+        "axes.titlesize": 9.5, "axes.titleweight": "bold", "axes.labelsize": 8.5,
+        "xtick.labelsize": 7.5, "ytick.labelsize": 7.5, "legend.fontsize": 7.2,
+        "axes.spines.top": False, "axes.spines.right": False, "axes.linewidth": .7,
+        "axes.edgecolor": "#3F4448", "xtick.color": "#3F4448", "ytick.color": "#3F4448",
+        "text.color": "#25282A", "axes.labelcolor": "#25282A", "figure.facecolor": "white",
+        "axes.facecolor": "white", "svg.fonttype": "none", "pdf.fonttype": 42,
+    })
 
 
 def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> list[Path]:
@@ -152,22 +158,28 @@ def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> li
     _style(plt)
     made: list[Path] = []
 
-    fig, ax = plt.subplots(figsize=(7.2, 2.8), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(7.2, 3.55), constrained_layout=True)
     rows = extracted["figure1"]
-    x = np.arange(len(rows))
-    colors = [PALETTE["blue"]] * 4 + ["white"]
-    ax.scatter(x, [0] * len(x), s=900, c=colors, edgecolors=PALETTE["gray"], linewidths=1.2, zorder=3)
-    ax.plot(x, [0] * len(x), color="#BBBBBB", lw=2, zorder=1)
+    from textwrap import fill
+    y = np.arange(len(rows))[::-1]
+    ax.plot([.65, .65], [y[-1], y[0]], color="#B9BEC2", lw=1.4, zorder=1)
     for i, row in enumerate(rows):
-        ax.text(i, 0, str(row["stage"]), ha="center", va="center", color="white" if i < 4 else "black", weight="bold")
-        ax.text(i, .42, row["evidence"], ha="center", va="bottom", weight="bold", fontsize=7.5)
-        ax.text(i, -.42, row["evidence_status"], ha="center", va="top", fontsize=6.8, wrap=True)
-    ax.text(4, .08, "NOT RUN", ha="center", va="center", fontsize=6, weight="bold")
-    ax.set(xlim=(-.55, 4.55), ylim=(-1.05, .95), title="Evidence ladder for a computational measurement claim")
+        completed = i < 4
+        ax.scatter(.65, y[i], s=430, color=PALETTE["blue"] if completed else "white",
+                   edgecolor=PALETTE["blue"] if completed else PALETTE["gray"], linewidth=1.2, zorder=3)
+        ax.text(.65, y[i], str(row["stage"]), ha="center", va="center",
+                color="white" if completed else PALETTE["gray"], weight="bold", fontsize=8)
+        ax.text(1.15, y[i] + .14, row["evidence"], ha="left", va="center", weight="bold", fontsize=8.2)
+        ax.text(1.15, y[i] - .17, fill(str(row["evidence_status"]), 86), ha="left", va="center",
+                fontsize=7.3, color="#52575B", linespacing=1.25)
+        if not completed:
+            ax.text(6.85, y[i], "NOT COMPLETED", ha="right", va="center", fontsize=6.8,
+                    color=PALETTE["red"], weight="bold")
+    ax.set(xlim=(0, 7.05), ylim=(-.55, 4.55), title="Evidence ladder for a computational measurement claim")
     ax.axis("off")
     made += _save(fig, output / "figure1_evidence_ladder")
 
-    fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.4), sharex=True, sharey="row", constrained_layout=True)
+    fig, axes = plt.subplots(2, 2, figsize=(7.2, 5.8), sharex=True, sharey="row")
     simrows = extracted["figure2"]
     for col, effect in enumerate((0.0, 0.55)):
         for method, color, marker in zip(METHOD_ORDER, (PALETTE["blue"], PALETTE["red"], PALETTE["gray"]), ("o", "s", "^")):
@@ -177,39 +189,54 @@ def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> li
                 for rowi, prefix in ((0, "latent_recovery_correlation"), (1, "split_half_residual_reliability")):
                     ys = np.array([r[prefix + "_mean"] for r in subset])
                     lo = np.array([r[prefix + "_q025"] for r in subset]); hi = np.array([r[prefix + "_q975"] for r in subset])
-                    axes[rowi, col].errorbar(xs, ys, yerr=[ys-lo, hi-ys], color=color, marker=marker, ls=ls, lw=1, ms=4, capsize=2,
-                                               label=f"{METHOD_LABELS[method]}; {over} OD" if rowi == 0 and col == 0 else None)
+                    axes[rowi, col].errorbar(xs, ys, yerr=[ys-lo, hi-ys], color=color, marker=marker, ls=ls,
+                                               lw=1.25, ms=4.2, capsize=3, capthick=1, elinewidth=1,
+                                               label=METHOD_LABELS[method] if rowi == 0 and col == 0 and over == "low" else None)
         axes[0, col].set_title("Null latent effect" if effect == 0 else "Latent effect = 0.55")
         axes[1, col].set_xlabel("Subjects")
     axes[0, 0].set_ylabel("Alignment with generating z, r")
     axes[1, 0].set_ylabel("Split reliability, r")
-    for ax in axes.flat: ax.axhline(0, color="#BBBBBB", lw=.7); ax.grid(axis="y", color="#EEEEEE")
-    axes[0, 0].legend(frameon=False, fontsize=6, ncol=2)
-    axes[1, 0].annotate("High reliability under the null\nwhen nuisance fit is misspecified", xy=(84, next(r["split_half_residual_reliability_mean"] for r in simrows if r["latent_effect"] == 0 and r["subjects"] == 84 and r["method"] == "misspecified" and r["overdispersion"] == "low")), xytext=(8, .45), arrowprops={"arrowstyle": "->", "color": PALETTE["red"]}, color=PALETTE["red"], fontsize=7)
+    for ax in axes.flat:
+        ax.axhline(0, color="#AEB3B7", lw=.7); ax.grid(axis="y", color="#E7E9EA", lw=.6); ax.set_axisbelow(True)
+    method_handles, method_labels = axes[0, 0].get_legend_handles_labels()
+    from matplotlib.lines import Line2D
+    dispersion_handles = [Line2D([0], [0], color="#555B60", lw=1.3, ls="-", label="Lower overdispersion"),
+                          Line2D([0], [0], color="#555B60", lw=1.3, ls="--", label="Higher overdispersion")]
+    fig.legend(method_handles + dispersion_handles, method_labels + [h.get_label() for h in dispersion_handles],
+               loc="lower center", bbox_to_anchor=(.5, .005), frameon=False, ncol=3, columnspacing=1.6, handlelength=2.6)
+    fig.subplots_adjust(left=.09, right=.985, top=.93, bottom=.18, hspace=.2, wspace=.14)
     made += _save(fig, output / "figure2_reliability_paradox")
 
-    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.3), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 3.7))
     specs = extracted["figure3"]
     obs_nll = [[r["nll_minus_uniform"] for r in specs if r["specification"] == name and r["kind"] == "observed"] for name in SPEC_ORDER]
-    axes[0].boxplot(obs_nll, tick_labels=[s.replace("_", "\n") for s in SPEC_ORDER], showfliers=False, widths=.6)
+    bp = axes[0].boxplot(obs_nll, tick_labels=[s.replace("_", "\n") for s in SPEC_ORDER], showfliers=False, widths=.58, patch_artist=True)
+    for box in bp["boxes"]: box.set(facecolor="#DCE5EA", edgecolor=PALETTE["blue"])
     axes[0].set_ylabel("Held-out NLL minus uniform"); axes[0].set_title("Predictive fit (lower is better)")
     positions = np.arange(1, 5)
     for i, name in enumerate(SPEC_ORDER):
         observed = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "observed"]
         null = [r["edge_weighted_reliability"] for r in specs if r["specification"] == name and r["kind"] == "destruction_control"]
-        violin = axes[1].violinplot([null], positions=[positions[i]-.14], widths=.22,
+        violin = axes[1].violinplot([null], positions=[positions[i]-.18], widths=.32,
                                     showmeans=False, showmedians=True, showextrema=True)
         for body in violin["bodies"]:
             body.set_facecolor(PALETTE["gray"]); body.set_alpha(.45)
         for key in ("cmedians", "cmins", "cmaxes", "cbars"):
-            violin[key].set_color(PALETTE["gray"]); violin[key].set_linewidth(.8)
-        axes[1].boxplot([observed], positions=[positions[i]+.14], widths=.22, showfliers=False, patch_artist=True, boxprops={"facecolor": PALETTE["blue"], "alpha": .65})
+            violin[key].set_color(PALETTE["gray"]); violin[key].set_linewidth(1.15)
+        axes[1].boxplot([observed], positions=[positions[i]+.18], widths=.30, showfliers=False, patch_artist=True,
+                        boxprops={"facecolor": PALETTE["blue"], "alpha": .65, "linewidth": 1},
+                        medianprops={"color": "white", "linewidth": 1.35}, whiskerprops={"linewidth": 1}, capprops={"linewidth": 1})
     axes[1].set_xticks(positions, [s.replace("_", "\n") for s in SPEC_ORDER]); axes[1].set_ylabel("Edge-weighted partition agreement, r")
-    axes[1].set_title("Observed (blue) vs descriptive control (gray)")
-    axes[1].text(.02, .98, "500 destination-label destruction controls", transform=axes[1].transAxes, va="top", fontsize=7)
+    axes[1].set_title("Partition agreement")
+    for ax in axes: ax.grid(axis="y", color="#E7E9EA", lw=.6); ax.set_axisbelow(True)
+    from matplotlib.patches import Patch
+    fig.legend([Patch(facecolor=PALETTE["blue"], alpha=.65), Patch(facecolor=PALETTE["gray"], alpha=.4)],
+               ["Observed: 100 fixed-sample partitions", "Descriptive control: 500 destination-label destructions"],
+               loc="lower center", bbox_to_anchor=(.5, .015), frameon=False, ncol=2, columnspacing=2)
+    fig.subplots_adjust(left=.095, right=.985, top=.9, bottom=.23, wspace=.28)
     made += _save(fig, output / "figure3_specification_curve")
 
-    fig, axes = plt.subplots(1, 3, figsize=(7.2, 2.9), constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(7.2, 3.45), gridspec_kw={"width_ratios": [1.05, 1.35, .9]})
     functional = extracted["figure4"]
     provo = [r for r in functional if r["panel"] == "provo"]
     by_seed = {r["seed"]: r for r in provo if r["condition"] == "mlm"}
@@ -220,20 +247,27 @@ def make_figures(extracted: dict[str, list[dict[str, Any]]], output: Path) -> li
     macro = next(r for r in functional if r["panel"] == "provo_summary")
     axes[0].axhline(macro["macro_text_correlation"], color=PALETTE["green"], lw=1.2, label="text-equal macro")
     axes[0].axvline(0, color="#999999", lw=.8); axes[0].set(xlabel="Gaze - MLM NLL", ylabel="Residual correlation", title="Provo: fixed seeded 10-text split")
-    axes[0].legend(frameon=False, fontsize=6)
     zuco = [r for r in functional if r["panel"] == "zuco"]
     y = np.arange(3)
     means = np.array([r["mean"] for r in zuco])
     fixed_lo=np.array([r["fixed_ci_low"] for r in zuco]); fixed_hi=np.array([r["fixed_ci_high"] for r in zuco])
     nested_lo=np.array([r["nested_ci_low"] for r in zuco]); nested_hi=np.array([r["nested_ci_high"] for r in zuco])
-    axes[1].errorbar(means, y-.09, xerr=[means-fixed_lo, fixed_hi-means], fmt="o", color=PALETTE["blue"], capsize=3, label="fixed 12; text resampling")
-    axes[1].errorbar(means, y+.09, xerr=[means-nested_lo, nested_hi-means], fmt="s", color=PALETTE["orange"], capsize=3, label="support-varying reader-refit diagnostic")
-    axes[1].axvline(0, color="#999999", lw=.8); axes[1].set_yticks(y, [r["contrast"].replace("gaze_vs_", "vs ") for r in zuco]); axes[1].set(xlabel="Fisher-z difference", title="ZuCo: descriptive ranges"); axes[1].legend(frameon=False, fontsize=6)
+    fixed_artist = axes[1].errorbar(means, y-.10, xerr=[means-fixed_lo, fixed_hi-means], fmt="o", color=PALETTE["blue"], capsize=3.5, lw=1.2, label="Fixed 12 readers; text reaggregation")
+    nested_artist = axes[1].errorbar(means, y+.10, xerr=[means-nested_lo, nested_hi-means], fmt="s", color=PALETTE["orange"], capsize=3.5, lw=1.2, label="Support-varying reader-refit diagnostic")
+    axes[1].axvline(0, color="#999999", lw=.8); axes[1].set_yticks(y, [r["contrast"].replace("gaze_vs_", "vs ") for r in zuco]); axes[1].set(xlabel="Fisher-z difference", title="ZuCo: descriptive ranges")
     inv = data_global["invariance"]
     vals = [inv["residual_distribution"][c]["pearson_dispersion"]["mean"] for c in ("provo", "zuco")]
     axes[2].bar(("Provo", "ZuCo"), vals, color=(PALETTE["blue"], PALETTE["orange"]), width=.6)
-    axes[2].set(ylabel="Mean Pearson dispersion", title="Measurement conditions")
-    axes[2].text(.5, .95, f"Domain balanced accuracy\n{inv['domain_distinguishability']['balanced_accuracy']:.3f}", transform=axes[2].transAxes, ha="center", va="top", fontsize=7)
+    axes[2].set_ylabel("Mean Pearson dispersion")
+    axes[2].set_title(
+        f"Measurement conditions\nDomain balanced accuracy = {inv['domain_distinguishability']['balanced_accuracy']:.3f}",
+        fontsize=8.2, linespacing=1.35,
+    )
+    for ax in axes: ax.grid(axis="y", color="#E7E9EA", lw=.6); ax.set_axisbelow(True)
+    macro_artist = Line2D([0], [0], color=PALETTE["green"], lw=1.4, label="Provo text-equal macro")
+    fig.legend([macro_artist, fixed_artist, nested_artist], ["Provo text-equal macro", "ZuCo fixed 12; text reaggregation", "ZuCo support-varying reader-refit diagnostic"],
+               loc="lower center", bbox_to_anchor=(.5, .01), frameon=False, ncol=3, columnspacing=1.2, handlelength=2.2)
+    fig.subplots_adjust(left=.085, right=.985, top=.82, bottom=.25, wspace=.42)
     made += _save(fig, output / "figure4_functional_evidence")
     plt.close("all")
     return made
